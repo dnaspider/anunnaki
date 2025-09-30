@@ -67,12 +67,13 @@ bool ignoreNumPad = 1;
 bool ignoreOtherKeys = 1;
 bool auto_bs_repeat_key = 0;
 bool ctrl_scan_only_mode = 0;
-bool close_ctrl_mode = 0;
+bool close_ctrl_mode = 1;
 bool ManualRepeat = 1;
 bool hold_shift = 0;
 bool out_sleep = 1;
 bool stop = 0;
 bool utf_8 = 1;
+bool ccm = 0; //close_ctrl_mode toggle
 
 #pragma endregion
 
@@ -145,14 +146,15 @@ static vector<Strand> make_vdb_table() {
 
 			s.in = cell.substr(0, cell.find_first_of(L" -:>"));
 
-			if (!s.g[0]) s.g = cell.substr(s.in.length(), 1);
+			if (!s.g[0]) {
+				s.g = cell.substr(s.in.length(), 1);
+				if (s.g[0] && s.g[0] != '>') s.g += cell[s.in.length() + 1] == '>' ? L">" : L"";
+			}
 
-			wstring nuke = cell.substr(s.in.length() + s.g.length());
-			s.out = nuke[0] == '>' ? nuke.substr(1) : cell.substr(s.in.length() + s.g.length());
+			s.out = cell.substr(s.in.length() + s.g.length());
 
 			if (s.in[0] == '<')
-				if (s.g[0] == ' ' || s.g[0] == '-' || s.g[0] == ':')
-					s.in += s.g + L">";
+				s.in += s.g;
 		}
 
 		vstrand.push_back(s);
@@ -1018,6 +1020,7 @@ static wstring connect(wstring& w, bool bg = 0) {
 		vstrand.at(0).out.clear();
 		strand = qqs;
 		scan_db(vstrand, 1);
+		strand.clear();
 		if (vstrand.at(0).out[0]) {
 			if (delimiter[0] != '\n') { vstrand.at(0).out = regex_replace(vstrand.at(0).out, wregex(L"\n"), L""); vstrand.at(0).out = regex_replace(vstrand.at(0).out, wregex(L"\t"), L""); }
 			wstring x = vstrand.at(0).out,
@@ -1511,14 +1514,16 @@ static void scan_db(vector<Strand> const& vdb, bool ret = 0) {
 
 	for (size_t i = 0; i < vdb.size(); ++i)
 	{
-		if (ret) { //return_connect
-			if (vdb.at(i).in[0] != '<') continue;
-		}
+		//return_connect
+		if (ret && vdb.at(i).in[0] != '<')
+			continue;
 
 		if (repeats[0] == '>'
 			|| fallthrough_
-			|| vdb.at(i).in == strand.substr(0, strand.length() - 1 + ret)
-			|| close_ctrl_mode && vdb.at(i).in == strand.substr(0, strand.length())
+			|| close_ctrl_mode && vdb.at(i).in == strand.substr(0, strand.length() - 1 + ret)
+			|| close_ctrl_mode && vdb.at(i).in.substr(0, strand.length() - 1) == strand.substr(0, strand.length() - 1 + ret)
+			|| !close_ctrl_mode && vdb.at(i).in == strand
+			|| !close_ctrl_mode && vdb.at(i).in == strand + vdb.at(i).g
 			) {
 
 			if (ret) {
@@ -1526,12 +1531,12 @@ static void scan_db(vector<Strand> const& vdb, bool ret = 0) {
 				return;
 			}
 
-			out.clear();
+			if (out[0]) out.clear();
 
 			if (repeats[0] == '>') {
 				repeats = repeats.substr(1);
 				if (!repeats[0]) return;
-				out = repeats;//vdb.at(stoi(repeats)).out;
+				out = repeats;
 			}
 			else {
 				repeat_switch = 0;
@@ -2810,7 +2815,7 @@ static void scan_db(vector<Strand> const& vdb, bool ret = 0) {
 	out_speed = 0;
 	if (RSHIFTLSHIFT_Only) rri = 0;
 	if (found_io || strand[0] && strand[strand.length() - 1] == '>') {
-		if (close_ctrl_mode) close_ctrl_mode = !close_ctrl_mode;
+		if (ccm) { close_ctrl_mode = !close_ctrl_mode; ccm = 0; }
 		strand.clear();
 		prints();
 		stop = 0;
@@ -2879,7 +2884,7 @@ static void key(wstring k, vector<Strand> const& vdb) {
 
 	strand.append(k);
 
-	if (k[0] == '>' || close_ctrl_mode) {
+	if (k[0] == '>' || !close_ctrl_mode) {
 		prints();
 		//scan_db(vdb);
 		thread thread(scan, cref(vdb)); thread.detach();
@@ -3018,6 +3023,7 @@ RgbScaleLayout			1.00
 					if (min > RSHIFTCtrlKeyToggle) { ex = 1; break; }
 					if (cKey == VK_SPACE) kb(VK_BACK);
 					close_ctrl_mode = !close_ctrl_mode;
+					ccm = !ccm;
 					ex = 1; break;
 				}
 				++min;
