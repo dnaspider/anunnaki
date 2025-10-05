@@ -34,17 +34,17 @@ db = L"db.txt - ", se = L"se.txt - ",
 editorSe = se + editor, editorDb = db + editor;
 wstring strand = L"";
 wstring qq = L"", qp = L"", qx = L"", qy = L"";
-wstring w_delimiter = L"\n"; //°";
-string delimiter = ""; //°";
 wstring repeats = L"";
 wstring Loop_Insert_Text = L"";
 wstring out = L"", in = L"";
+wstring w_delimiter = L"\n"; //°";
+string delimiter = ""; //°";
 double RgbScaleLayout = 1.00; //100%
 double ic = 0; //<+> icp
 vector<Strand> vstrand{};
 size_t c = 0;
 int qxcc = 0, qycc = 0;
-unsigned int out_speed = 0;
+unsigned short out_speed = 0;
 unsigned short frequency = 160;
 unsigned short strand_length = 2;
 unsigned short RSHIFTLSHIFT_Only = 0, rri = 0;
@@ -56,9 +56,9 @@ unsigned short RSHIFTCtrlKeyToggle = 9;
 unsigned short LSHIFTCtrlKey = 9;
 unsigned short repeat_switch = 0;
 unsigned short debug = 0;
+unsigned short mvdb = 0; //make vstrand to vdb
 bool start_hidden = 0;
 bool show_strand = 1;
-bool show_settings = 1;
 bool ignoreAZ = 0;
 bool ignore09 = 0;
 bool ignoreF1s = 0; //f1-f12
@@ -92,7 +92,10 @@ struct Multi_ {
 
 #pragma region protos
 static void showOutsMsg(wstring, wstring, wstring, bool),
-run(wstring, vector<Strand> const&, bool);
+	run(wstring, vector<Strand> const&, bool),
+	scan_db(vector<Strand> const&, bool),
+	clear_all_keys()
+;
 
 #pragma endregion
 
@@ -205,9 +208,11 @@ static auto cbGet(wstring cb = L"") {
 	return cb;
 }
 
-static void num_error(wstring error_msg = L"", wstring v = L"") {
+static void num_error(wstring error_msg = L"", wstring v = L"", wstring nan = L"NAN:") {
 	wstring e = error_msg[0] ? L" " : L"";
-	e += L"\\4NAN: \\7{\\4\\0C\\" + v + L"\\0C\\\\7}\\n";
+	e += L"\\4";
+	e += nan;
+	e += L" \\7{\\4\\0C\\" + v + L"\\0C\\\\7}\\n";
 	showOutsMsg(error_msg, e, L"", 1);
 	c = out.length();
 	ShowWindow(GetConsoleWindow(), SW_RESTORE);
@@ -326,7 +331,8 @@ static void showOutsMsg(wstring s, wstring w, wstring s1 = L"", bool make_color 
 			}
 			if (t) continue;
 		}
-		wcout << w[x];
+		if (w[x] < 128) wcout << w[x];
+		else { wcout << w.substr(x, 2); ++x; }
 	}
 	wcout << s1;
 }
@@ -356,7 +362,7 @@ static void load_settings() {
 		case 545://Debug:
 		{ if (v == L"0" || v == L"1" || v == L"2") debug = stoi(v); else er(); } break;
 		case 353://UTF8:
-		{ if (se == L"UTF8:") { if (v == L"0" || v == L"1") utf_8 = stoi(v); } else er(); } break;
+		{ if (se == L"UTF8:") { if (v == L"0" || v == L"1") if (v == L"1" && !utf_8) { wcout.flush().clear(); num_error(L"Reload program for", L"1", L"UTF_8:"); } utf_8 = stoi(v); } else er(); } break;
 		case 1536://RSHIFT+LSHIFT_Only:
 		{ if (check_if_num(v) > L"") { RSHIFTLSHIFT_Only = stoi(v); rri = 0; } else er(); } break;
 		case 1261://LSHIFT+CtrlKey:
@@ -580,6 +586,8 @@ static void load_settings() {
 		{ if (v == L"0" || v == L"1") show_strand = stoi(v); else er(); } break;
 		case 847://Database:
 		{ if (v.length() > 0) { database = v; database = regex_replace(database, wregex(L"/"), L"\\"); db = database.substr(database.find_last_of('\\') + 1) + L" - "; } else er(); } break;
+		case 907://Settings:
+		{ if (v.length() > 0) { settings = v; settings = regex_replace(settings, wregex(L"/"), L"\\"); se = settings.substr(settings.find_last_of('\\') + 1) + L" - "; } else er(); } break;
 		case 1038://ReplacerDb:
 			replacerDb = v; break;
 		case 1313://Kb_Key_Delete:
@@ -611,8 +619,6 @@ static void load_settings() {
 			if (check_if_num(v, L"CtrlKey") == L"") { er(); break; }
 			cKey = stoi(v);
 		} break;
-		case 1324://ShowSettings:
-		{ if (v == L"0" || v == L"1") show_settings = stoi(v); else er(); } break;
 		case 1004://Frequency:
 		{ if (check_if_num(v) > L"") frequency = stoi(v); else er(); } break;
 		case 964://RepeatKey:
@@ -640,11 +646,12 @@ static void load_settings() {
 			ignoreOtherKeys = 1;
 	}
 	f.close();
+	clear_all_keys();
 }
 
 static void printSe() {
-	load_settings();
-	if (show_settings) {
+	if (qq[1] == 's') load_settings();
+	if (qq[1] == 's' || qq[1] == 'S') {
 		if (qq[1] == 'S') return;
 		wcout << settings << '\n'; ifstream f(settings); if (f.fail()) { showOutsMsg(L"Copy to ", settings, L"\n", 0); }
 		cout << "StartHidden: " << start_hidden << '\n';
@@ -652,7 +659,6 @@ static void printSe() {
 		wcout << "Database: " << database << '\n';
 		cout << "DbMultiLineDelimiter: "; if (delimiter[0] == '\n') cout << "\\n\n"; else cout << delimiter.substr(1) << '\n';
 		wcout << "ReplacerDb: " << replacerDb << '\n';
-		cout << "ShowSettings: " << show_settings << '\n';
 		cout << "UTF8: " << utf_8 << '\n';
 		cout << "ShowInput: " << show_strand << '\n';
 		cout << "InputLength: " << strand_length << '\n';
@@ -797,6 +803,10 @@ static void rei() {
 	c += qq.find('>');
 }
 
+static void kb_clear(wchar_t b) {
+	GetAsyncKeyState(b);
+}
+
 static void kb(wchar_t b) { //out char
 	INPUT ip[2]{}; ip[0].type = INPUT_KEYBOARD;
 	ip[0].ki.dwFlags = KEYEVENTF_UNICODE;
@@ -842,7 +852,7 @@ static void bs_input(wchar_t k) {
 		(Kb_Key_Right_Ctrl[0] && k == Kb_Key_Right_Ctrl[0]) ||
 		(Kb_Key_Caps[0] && k == Kb_Key_Caps[0]))
 		return;
-	kb(VK_BACK);
+	kb(VK_BACK); kb_clear(VK_BACK);
 
 }
 
@@ -998,7 +1008,6 @@ static wstring isVar(wstring& q) { // Replacer | {var} {var:} {var-} {var>} | <r
 	return q;
 }
 
-static void scan_db(vector<Strand> const&, bool);
 static wstring connect(wstring& w, bool bg = 0) {
 	bool con = 0;
 	wstring qqs = qq.substr(0, qq.find('>') + 1);
@@ -1048,14 +1057,14 @@ static bool testqqb(const wstring s) {
 static void clear_all_keys() {
 	if (!ignoreAZ) for (int i = 65; i < 91; ++i) { GetAsyncKeyState(i); }
 	if (!ignore09) for (int i = 48; i < 58; ++i) { GetAsyncKeyState(i); }
-	GetAsyncKeyState(VK_RSHIFT);
-	GetAsyncKeyState(VK_LSHIFT);
-	GetAsyncKeyState(VK_BACK);
-	GetAsyncKeyState(VK_LCONTROL);
-	GetAsyncKeyState(VK_RCONTROL);
-	GetAsyncKeyState(VK_PAUSE);
-	GetAsyncKeyState(VK_SPACE);
-	GetAsyncKeyState(VK_ESCAPE);
+	if (Kb_Key_Right_Shift[0]) GetAsyncKeyState(VK_RSHIFT);
+	if (Kb_Key_Left_Shift[0]) GetAsyncKeyState(VK_LSHIFT);
+	//GetAsyncKeyState(VK_BACK);
+	if (Kb_Key_Left_Ctrl[0]) GetAsyncKeyState(VK_LCONTROL);
+	if (Kb_Key_Right_Ctrl[0]) GetAsyncKeyState(VK_RCONTROL);
+	//GetAsyncKeyState(VK_PAUSE);
+	if (Kb_Key_Space[0]) GetAsyncKeyState(VK_SPACE);
+	if (Kb_Key_Esc[0]) GetAsyncKeyState(VK_ESCAPE);
 	if (!ignoreF1s) { GetAsyncKeyState(VK_F1); GetAsyncKeyState(VK_F2); GetAsyncKeyState(VK_F3); GetAsyncKeyState(VK_F4); GetAsyncKeyState(VK_F5); GetAsyncKeyState(VK_F6); GetAsyncKeyState(VK_F7); GetAsyncKeyState(VK_F8); GetAsyncKeyState(VK_F9); GetAsyncKeyState(VK_F10); GetAsyncKeyState(VK_F11); GetAsyncKeyState(VK_F12); }
 	if (!ignoreArrows) { GetAsyncKeyState(VK_LEFT); GetAsyncKeyState(VK_UP); GetAsyncKeyState(VK_RIGHT); GetAsyncKeyState(VK_DOWN); }
 	if (Kb_Key_Tab[0])GetAsyncKeyState(VK_TAB);
@@ -1113,8 +1122,17 @@ RCTRL, F2, RSHIFT+LSHIFT, COMMA+ESC
 RepeatKey options:
 PAUSE, RCTRL+LCTRL, EQUAL+ESC
 
-<se>		Print settings to console
-<test ><se>
+Clear input:
+Hold RSHIFT, Press LSHIFT three times
+
+Settings
+<se>		Reload, print to console. Use SE to only print
+<se:>		Load other
+<test ><SE>
+
+Database
+<db>		Print
+<db:>		Load too. Use se.txt [Database] for fresh db
 
 Mouse event
 <~>		Set current position
@@ -1147,7 +1165,7 @@ Stop if false
 <ifapp~: title>
 
 Loop. Check every 160ms
-<ifapp~: t,>
+<ifapp~: title,>
 
 Check 3 times. 3000ms delay
 <ifapp~: t, 3, 3000>
@@ -1160,7 +1178,7 @@ Link to false if false
 <ifapp~: t, 1, 1, f:>
 <f:><'F>
 
-Open true false slots with SPACE
+Open true false link slots with SPACE
 <ifapp~: t, 1, 1, t: f:>
 <t:><<:T>
 <f:><<:F>
@@ -1239,7 +1257,7 @@ Sleep
 Output speed
 <speed:160>
 
-Message box
+Message box. Options: \SPACE \g \n
 <yesno: title continue?>
 
 Replace cb
@@ -1256,8 +1274,8 @@ Audio:
 <Audio: c:\anu\fx.wav>
 <audio: play c:\anu\fx.mp3>
 
+Set se.txt [RgbScaleLayout] to match Display settings > Scale & layout. [1.00] is 100%
 <ifrgb:>	Continue running if rgbxy is true
-Set se.txt [RgbScaleLayout] to match system display scale & layout: 1.00 (100%)
 <ifrgb~:>	Use ~ to set mouse pointer to x y if r g b is true
 
 Syntax		Use either & or | 
@@ -1274,8 +1292,8 @@ Syntax		Use either & or |
 <ifxy:>
 
 <xy>	Type
-<app>
 <rgb>
+<app>	Cb
 <cb>	Paste
 <cb:>	Set
 
@@ -1284,7 +1302,8 @@ Manual controls:
 <!!:>	Set repeat
 
 misc.
-Use \\\\g for >
+Use legacy terminal: Terminal settings > Terminal > Windows Console Host
+Use \\\\g for > in <ifapp:>
 Other: \, \| \&
 )";
 
@@ -1433,7 +1452,6 @@ static void multi_sleep(Multi_ multi_, unsigned short ms, unsigned short n = 1) 
 		multi_.out_ = out;
 		multi_.qq_ = qq;
 		multi_.qp_ = qp;
-		multi_.strand_ = strand;
 		multi_.c_ = c;
 
 		if (n > 1) {
@@ -1449,60 +1467,62 @@ static void multi_sleep(Multi_ multi_, unsigned short ms, unsigned short n = 1) 
 		out = multi_.out_;
 		qq = multi_.qq_;
 		qp = multi_.qp_;
-		strand = multi_.strand_;
 		c = multi_.c_;
 	}
 }
 
 static inline void clear_key(wchar_t key) {
-	if (key > 96 && key < 123) //clear key
+	if (key > 64 && key < 91) //clear key
+		GetAsyncKeyState(key); //A-Z
+	else if (key > 96 && key < 123)
 		GetAsyncKeyState(key - 32); //a-z
 	else {
 		auto x = 0;
 		switch (key) {
-		case ' ': x = VK_SPACE; break;
-		case '0':
-		case ')': x = 48; break;
-		case '1':
-		case '!': x = 49; break;
-		case '2':
-		case '@': x = 50; break;
-		case '3':
-		case '#': x = 51; break;
-		case '4':
-		case '$': x = 52; break;
-		case '5':
-		case '%': x = 53; break;
-		case '6':
-		case '^': x = 54; break;
-		case '7':
-		case '&': x = 55; break;
-		case '8':
-		case '*': x = 56; break;
-		case '9':
-		case '(': x = 57; break;
-		case '_':
-		case '-': x = VK_SUBTRACT; break;
-		case '+':
-		case '=': x = VK_OEM_PLUS; break;
-		case '{':
-		case '[': x = VK_OEM_4; break;
-		case '}':
-		case ']': x = VK_OEM_6; break;
-		case '|':
-		case '\\': x = VK_OEM_5; break;
-		case ':':
-		case ';': x = VK_OEM_1; break;
+		case '\b': x = 8; break;
+		case ' ': x = 32; break;
 		case '"':
-		case '\'': x = VK_OEM_7; break;
+		case '\'': x = 39; break;
 		case '<':
-		case ',': x = VK_OEM_COMMA; break;
+		case ',': x = 44; break;
+		case '_':
+		case '-': x = 45; break;
 		case '>':
-		case '.': x = VK_OEM_PERIOD; break;
+		case '.': x = 46; break;
 		case '?':
-		case '/': x = VK_OEM_2; break;
+		case '/': x = 47; break;
+		case ')':
+		case '0': x = 48; break;
+		case '!':
+		case '1': x = 49; break;
+		case '@':
+		case '2': x = 50; break;
+		case '#':
+		case '3': x = 51; break;
+		case '$':
+		case '4': x = 52; break;
+		case '%':
+		case '5': x = 53; break;
+		case '^':
+		case '6': x = 54; break;
+		case '&':
+		case '7': x = 55; break;
+		case '*':
+		case '8': x = 56; break;
+		case '(':
+		case '9': x = 57; break;
+		case ';':
+		case ':': x = 58; break;
+		case '+':
+		case '=': x = 61; break;
+		case '{':
+		case '[': x = 91; break;
+		case '|':
+		case '\\': x = 92; break;
+		case '}':
+		case ']': x = 93; break;
 		case '~':
-		case '`': x = VK_OEM_3; break;
+		case '`': x = 96; break;
 		}
 		GetAsyncKeyState(x);
 	}
@@ -1521,7 +1541,9 @@ static void scan_db(vector<Strand> const& vdb, bool ret = 0) {
 		if (repeats[0] == '>'
 			|| fallthrough_
 			|| close_ctrl_mode && vdb.at(i).in == strand.substr(0, strand.length() - 1 + ret)
-			|| close_ctrl_mode && vdb.at(i).in.substr(0, strand.length() - 1) == strand.substr(0, strand.length() - 1 + ret)
+			|| vdb.at(i).in[0] == '<' &&
+				vdb.at(i).in.substr(0, vdb.at(i).in.length() - vdb.at(i).g.length())
+				== strand.substr(0, strand.length() - 1 + ret)
 			|| !close_ctrl_mode && vdb.at(i).in == strand
 			|| !close_ctrl_mode && vdb.at(i).in == strand + vdb.at(i).g
 			) {
@@ -1628,15 +1650,28 @@ static void scan_db(vector<Strand> const& vdb, bool ret = 0) {
 					case '!':
 						if (testqqb(L"<!:")) { //set strand
 							strand = qp;
+							prints();
 							return;
 						}
 						else if (testqqb(L"<!!:")) { //set repeat
-							repeats = qq.substr(qq.find(':') + 1);
-							repeats = repeats.substr(0, repeats.find('>'));
-							qq = repeats;
-							repeats = connect(repeats, 1);
-							qq = out;
-							rei();
+							wstring v = qq.substr(qq.find(':') + 1);
+							v = v.substr(0, v.find('>'));
+							if (qq[qq.find(':') + 1] != '<')
+								num_error(L"Not a link", v, L"VALUE:");
+							else {
+								qq = v;
+								v = connect(v, 1);
+								if (!v[0]) {
+									kb(VK_BACK); kb_clear(VK_BACK);
+									sleep(frequency / 2);
+									num_error(L"Not found", qq, L"VALUE:");
+								}
+								else {
+									repeats = v;
+									qq = out;
+									rei();
+								}
+							}
 						}
 						else connect(out);
 						break;
@@ -1857,12 +1892,22 @@ static void scan_db(vector<Strand> const& vdb, bool ret = 0) {
 								if (qq[1] == 'D') showOutsMsg(L"", qp, L"", 0);
 								qp = regex_replace(qp, wregex(L"/"), L"\\");
 								wifstream f(qp); if (!f) { showOutsMsg(L"", L"\\n\\4Database \\7\\0C\\" + qp + L"\\0C\\\\4 not found!\\7\\n", L"", 1); return; }
-								database = qp;
-								db = database.substr(database.find_last_of('\\') + 1) + L" - ";
 								rei();
+								//append db
+								wstring t = qp;
+								database = qp;
+								mvdb = 2;
+								vstrand = make_vdb_table();
+								database = t;
 								break;
 							}
-							//else if (qqb(L"<db>")) { printDb(); rei(); }
+							else if (qqb(L"<db>")) { 
+								for (size_t i = 0; i < vdb.size(); ++i) {
+									auto in_ = vdb.at(i).in[0] && vdb.at(i).in[vdb.at(i).in.length() - 1] == '>' ? L"" : vdb.at(i).g;
+									wcout << i << L": " << vdb.at(i).in << in_ << vdb.at(i).out << L"\n";
+								}
+								rei();
+							}
 							else connect(out);
 							break;
 						case 'o':
@@ -2190,180 +2235,182 @@ static void scan_db(vector<Strand> const& vdb, bool ret = 0) {
 
 										//if loops
 										switch (qq[3]) {
-										case 'a':
-										case 'A': {
-											HWND h{}, h1{}; DWORD pid{};
+											case 'a':
+											case 'A': {
+												HWND h{}, h1{}; DWORD pid{};
 
-											if (qq[3] == 'A') { //ifApp
-												h = GetForegroundWindow(); h1 = FindWindowW(0, p[j].c_str());
-												if (h == h1) ++count;
-											}
-											else if (qq[3] == 'a') { //'ifapp
-												h = FindWindowW(0, p[j].c_str()); GetWindowThreadProcessId(h, &pid);
-												if (h) {
-													if (IsIconic(h)) { ShowWindow(h, SW_RESTORE); ShowWindow(h, SWP_SHOWWINDOW); }
-													if (qq[6] == '~') SetForegroundWindow(h); //ifapp~
-													++count;
+												if (qq[3] == 'A') { //ifApp
+													h = GetForegroundWindow(); h1 = FindWindowW(0, p[j].c_str());
+													if (h == h1) ++count;
 												}
-											}
-										}
-												break;
-										case 'r': {
-											R = L"", G = L"", B = L"", X = L"", Y = L"";
-											t = L" " + p[j];
-											for (unsigned short i = 0; i < spaces + 1; ++i) {
-												t = t.substr(t.find(' ') + 1);
-												if (!R[0]) { R = t.substr(0, t.find(' ')); continue; }
-												if (!G[0]) { G = t.substr(0, t.find(' ')); continue; }
-												if (!B[0]) { B = t.substr(0, t.find(' ')); continue; }
-												if (!X[0]) { X = t.substr(0, t.find(' ')); continue; }
-												if (!Y[0]) { Y = t; break; }
-											}
-
-											if (debug == 1) {
-												t = R + G + B + X + Y;
-												t = regex_replace(a, wregex(L"-"), L"");
-												if (check_if_num(t, L"CHECK RGBXY slot") != L"") { stop = 1; break; }
-											}
-
-											POINT pt;
-											COLORREF color;
-											HDC hDC;
-											hDC = GetDC(NULL);
-											if (X[0]) { color = GetPixel(hDC, int(stoi(X) * RgbScaleLayout), int(stoi(Y) * RgbScaleLayout)); }
-											else { GetCursorPos(&pt); color = GetPixel(hDC, int(pt.x * RgbScaleLayout), int(pt.y * RgbScaleLayout)); }
-											ReleaseDC(NULL, hDC);
-											if (color != CLR_INVALID
-												&& GetRValue(color) == stoi(R)
-												&& GetGValue(color) == stoi(G)
-												&& GetBValue(color) == stoi(B))
-												++count; //&
-										}
-												break;
-										case 'x': {
-											auto q = p[j].find(' ');
-											auto x = p[j].substr(0, q), y = p[j].substr(q + 1);
-											POINT pt; GetCursorPos(&pt);
-											if (x == L".") x = to_wstring(pt.x);
-											if (y == L".") y = to_wstring(pt.y);
-											auto tx = stoi(x), ty = stoi(y);
-
-											switch (qq[5]) {
-											case ':': //== <ifxy:> <ifxy=:> <ifxye:>
-											case '=':
-											case 'e': {
-												if (pt.x == tx && pt.y == ty) ++count = 1;
-												break;
-											}
-											case 'n': //!= <ifxyn:> <ifxy!:>
-											case '!': {
-												if (pt.x != tx && pt.y != ty) ++count = 1;
-												break;
-											}
-											case 'l'://<= <ifxyl:> <ifxyle:> <ifxy<:> <ifxy<=:>
-											case 'L':
-											case '<': {
-												if (qq[6] == 'e' || qq[6] == '=') { if (pt.x <= tx && pt.y <= ty) { ++count = 1; break; } } //ifxyle <=
-												if (pt.x < tx && pt.y < ty) ++count = 1;
-												break;
-											}
-											case 'g': { //>= <ifxyg:> <ifxyge:> <ifxyg=:>
-												if (qq[6] == 'e' || qq[6] == '=') { if (pt.x >= tx && pt.y >= ty) { ++count = 1; break; } } //ifxyge >=/g=
-												if (pt.x > tx && pt.y > ty) ++count = 1;
-												break;
-											}
-											}
-										}
-												break;
-										case 'c': {
-											HANDLE hcb;
-											wchar_t* cb;
-											wstring w;
-
-											OpenClipboard(0);
-											hcb = GetClipboardData(CF_UNICODETEXT);
-											if (hcb != nullptr) {
-												cb = static_cast<wchar_t*>(GlobalLock(hcb));
-												if (cb != nullptr)
-													w = cb;
-											}
-											CloseClipboard();
-
-											switch (qq[5]) {
-											case ':': //== <ifcb:> <ifcb=:> <ifcbe:>
-											case '=':
-											case 'e':
-												if (w == p[j]) ++count;
-												break;
-											case 'A': //<if cb find y starting @ offset x: x y> | <ifcba:1 test>
-											case 'a': { //<if cb substring from index x matches y: x y> | <ifcbA:0 test>
-												auto x = p[j].substr(0, p[j].find(' ')), y = p[j].substr(p[j].find(' ') + 1);
-												if (qq[5] == 'A') {
-													auto s = stoi(x) - 1;
-													if (w.find(y, s) != wstring::npos)
+												else if (qq[3] == 'a') { //'ifapp
+													h = FindWindowW(0, p[j].c_str()); GetWindowThreadProcessId(h, &pid);
+													if (h) {
+														if (IsIconic(h)) { ShowWindow(h, SW_RESTORE); ShowWindow(h, SWP_SHOWWINDOW); }
+														if (qq[6] == '~') SetForegroundWindow(h); //ifapp~
 														++count;
-												}
-												else { //'a'
-													if (w.substr(stoi(x), y.length()) == y)
-														++count;
-												}
-											}
-													break;
-											case 'S': //if cb starts with | <ifcbS:test>
-												if (w.starts_with(p[j]))
-													++count;
-												break;
-											case 'E': //<ifcbE:>
-												if (w.ends_with(p[j]))
-													++count;
-												break;
-											case 'n': //!= <ifcbn:> <ifcb!:>
-											case '!':
-												if (w != p[j])
-													++count;
-												break;
-											case 'f': //<ifcbf:>
-												if (regex_search(w, wregex(p[j])))
-													++count;
-												break;
-											case 'F': //<ifcbF:>
-												if (w.find(p[j]) != string::npos)
-													++count;
-												break;
-											case 'l'://<= <ifcbl:> <ifcble:> <ifcb<:> <ifcb<=:> || <ifcblen:>
-											case 'L':
-											case '<': {
-												if (check_if_num(p[j], L"a slot") != L"" && check_if_num(w, L"clipboard") != L"") {
-													if (qq.substr(5, 3) == L"len") { //length <ifcblen:> <ifcbleng:>
-														unsigned short len = stoi(p[j]);
-														if (qq[8] == '!' || qq[8] == 'n') { if (w.length() != len) { ++count; break; } }
-														else if (qq.substr(8, 2) == L"ge" || qq.substr(8, 2) == L"g=") { if (w.length() >= len) { ++count; break; } }
-														else if (qq.substr(8) == L"g") { if (w.length() > len) { ++count; break; } }
-														else if (qq.substr(8, 2) == L"le" || qq.substr(8, 2) == L"<e" || qq.substr(8, 2) == L"<=") { if (w.length() <= len) { ++count; break; } }
-														else if (qq[8] == 'l' || qq[8] == '<') { if (w.length() < len) { ++count; break; } }
-														else if (qq[8] == ':' || qq[8] == 'e' || qq[8] == '=') { if (w.length() == len) ++count; break; }//==
-														else { p[j].clear(); ++count; break; }
 													}
-													if (qq[6] == 'e' || qq[6] == '=') { if (a == L"0" && w == L"0" || stod(w) <= stod(a)) { ++count; break; } } //ifcble <=
-													if (stod(w) < stod(a)) ++count;
 												}
-												else {
-													stop = 1;
-													c = out.length();
-												}
-											}
-													break;
-											case 'g': { //>= <ifcbg:> <ifcbge:> <ifcbg=:>
-												if (check_if_num(p[j], L"a slot") != L"" && check_if_num(w, L"clipboard") != L"") {
-													if (qq[6] == 'e' || qq[6] == '=') { if (p[j] == L"0" && w == L"0" || stod(w) >= stod(p[j])) { ++count; break; } } //ifcbge >=/g=
-													if (stod(w) > stod(p[j])) ++count;
-												}
-											}
-													break;
-											}
-
-										}
 												break;
+											}
+											case 'r': {
+												R = L"", G = L"", B = L"", X = L"", Y = L"";
+												t = L" " + p[j];
+												for (unsigned short i = 0; i < spaces + 1; ++i) {
+													t = t.substr(t.find(' ') + 1);
+													if (!R[0]) { R = t.substr(0, t.find(' ')); continue; }
+													if (!G[0]) { G = t.substr(0, t.find(' ')); continue; }
+													if (!B[0]) { B = t.substr(0, t.find(' ')); continue; }
+													if (!X[0]) { X = t.substr(0, t.find(' ')); continue; }
+													if (!Y[0]) { Y = t; break; }
+												}
+
+												if (debug == 1) {
+													t = R + G + B + X + Y;
+													t = regex_replace(a, wregex(L"-"), L"");
+													if (check_if_num(t, L"CHECK RGBXY slot") != L"") { stop = 1; break; }
+												}
+
+												POINT pt;
+												COLORREF color;
+												HDC hDC;
+												hDC = GetDC(NULL);
+												if (X[0]) { color = GetPixel(hDC, int(stoi(X) * RgbScaleLayout), int(stoi(Y) * RgbScaleLayout)); }
+												else { GetCursorPos(&pt); color = GetPixel(hDC, int(pt.x * RgbScaleLayout), int(pt.y * RgbScaleLayout)); }
+												ReleaseDC(NULL, hDC);
+												if (color != CLR_INVALID
+													&& GetRValue(color) == stoi(R)
+													&& GetGValue(color) == stoi(G)
+													&& GetBValue(color) == stoi(B))
+													++count; //&
+										
+												break;
+											}
+											case 'x': {
+												auto q = p[j].find(' ');
+												auto x = p[j].substr(0, q), y = p[j].substr(q + 1);
+												POINT pt; GetCursorPos(&pt);
+												if (x == L".") x = to_wstring(pt.x);
+												if (y == L".") y = to_wstring(pt.y);
+												auto tx = stoi(x), ty = stoi(y);
+
+												switch (qq[5]) {
+													case ':': //== <ifxy:> <ifxy=:> <ifxye:>
+													case '=':
+													case 'e': {
+														if (pt.x == tx && pt.y == ty) ++count = 1;
+														break;
+													}
+													case 'n': //!= <ifxyn:> <ifxy!:>
+													case '!': {
+														if (pt.x != tx && pt.y != ty) ++count = 1;
+														break;
+													}
+													case 'l'://<= <ifxyl:> <ifxyle:> <ifxy<:> <ifxy<=:>
+													case 'L':
+													case '<': {
+														if (qq[6] == 'e' || qq[6] == '=') { if (pt.x <= tx && pt.y <= ty) { ++count = 1; break; } } //ifxyle <=
+														if (pt.x < tx && pt.y < ty) ++count = 1;
+														break;
+													}
+													case 'g': { //>= <ifxyg:> <ifxyge:> <ifxyg=:>
+														if (qq[6] == 'e' || qq[6] == '=') { if (pt.x >= tx && pt.y >= ty) { ++count = 1; break; } } //ifxyge >=/g=
+														if (pt.x > tx && pt.y > ty) ++count = 1;
+														break;
+													}
+												}
+											
+												break;
+											}
+											case 'c': {
+												HANDLE hcb;
+												wchar_t* cb;
+												wstring w;
+
+												OpenClipboard(0);
+												hcb = GetClipboardData(CF_UNICODETEXT);
+												if (hcb != nullptr) {
+													cb = static_cast<wchar_t*>(GlobalLock(hcb));
+													if (cb != nullptr)
+														w = cb;
+												}
+												CloseClipboard();
+
+												switch (qq[5]) {
+													case ':': //== <ifcb:> <ifcb=:> <ifcbe:>
+													case '=':
+													case 'e':
+														if (w == p[j]) ++count;
+														break;
+													case 'A': //<if cb find y starting @ offset x: x y> | <ifcba:1 test>
+													case 'a': { //<if cb substring from index x matches y: x y> | <ifcbA:0 test>
+														auto x = p[j].substr(0, p[j].find(' ')), y = p[j].substr(p[j].find(' ') + 1);
+														if (qq[5] == 'A') {
+															auto s = stoi(x) - 1;
+															if (w.find(y, s) != wstring::npos)
+																++count;
+														}
+														else { //'a'
+															if (w.substr(stoi(x), y.length()) == y)
+																++count;
+														}
+														break;
+													}
+													case 'S': //if cb starts with | <ifcbS:test>
+														if (w.starts_with(p[j]))
+															++count;
+														break;
+													case 'E': //<ifcbE:>
+														if (w.ends_with(p[j]))
+															++count;
+														break;
+													case 'n': //!= <ifcbn:> <ifcb!:>
+													case '!':
+														if (w != p[j])
+															++count;
+														break;
+													case 'f': //<ifcbf:>
+														if (regex_search(w, wregex(p[j])))
+															++count;
+														break;
+													case 'F': //<ifcbF:>
+														if (w.find(p[j]) != string::npos)
+															++count;
+														break;
+													case 'l'://<= <ifcbl:> <ifcble:> <ifcb<:> <ifcb<=:> || <ifcblen:>
+													case 'L':
+													case '<': {
+														if (check_if_num(p[j], L"a slot") != L"" && check_if_num(w, L"clipboard") != L"") {
+															if (qq.substr(5, 3) == L"len") { //length <ifcblen:> <ifcbleng:>
+																unsigned short len = stoi(p[j]);
+																if (qq[8] == '!' || qq[8] == 'n') { if (w.length() != len) { ++count; break; } }
+																else if (qq.substr(8, 2) == L"ge" || qq.substr(8, 2) == L"g=") { if (w.length() >= len) { ++count; break; } }
+																else if (qq.substr(8) == L"g") { if (w.length() > len) { ++count; break; } }
+																else if (qq.substr(8, 2) == L"le" || qq.substr(8, 2) == L"<e" || qq.substr(8, 2) == L"<=") { if (w.length() <= len) { ++count; break; } }
+																else if (qq[8] == 'l' || qq[8] == '<') { if (w.length() < len) { ++count; break; } }
+																else if (qq[8] == ':' || qq[8] == 'e' || qq[8] == '=') { if (w.length() == len) ++count; break; }//==
+																else { p[j].clear(); ++count; break; }
+															}
+															if (qq[6] == 'e' || qq[6] == '=') { if (a == L"0" && w == L"0" || stod(w) <= stod(a)) { ++count; break; } } //ifcble <=
+															if (stod(w) < stod(a)) ++count;
+														}
+														else {
+															stop = 1;
+															c = out.length();
+														}
+														break;
+													}
+													case 'g': { //>= <ifcbg:> <ifcbge:> <ifcbg=:>
+														if (check_if_num(p[j], L"a slot") != L"" && check_if_num(w, L"clipboard") != L"") {
+															if (qq[6] == 'e' || qq[6] == '=') { if (p[j] == L"0" && w == L"0" || stod(w) >= stod(p[j])) { ++count; break; } } //ifcbge >=/g=
+															if (stod(w) > stod(p[j])) ++count;
+														}
+														break;
+													}
+												}
+
+												break;
+											}
 										}
 
 										if (stop) break;
@@ -2408,6 +2455,8 @@ static void scan_db(vector<Strand> const& vdb, bool ret = 0) {
 								if (!multi_.br_) { c = out.length(); break; }
 
 								rei();
+
+								multi_.br_ = 0;
 
 							}
 							else if (testqqb(L"<if+")) {//<if+:> | stop if <+>
@@ -2661,7 +2710,13 @@ static void scan_db(vector<Strand> const& vdb, bool ret = 0) {
 								wifstream f(qp); if (!f) { showOutsMsg(L"", L"\\n\\4Settings \\7\\0C\\" + qp + L"\\0C\\\\4 not found!\\7", L"", 1); return; }
 								settings = qp;
 								se = settings.substr(settings.find_last_of('\\') + 1) + L" - ";
+								wstring db_ = database;
 								load_settings();
+								if (db_ != database) {
+									mvdb = 1;
+									vstrand.clear();
+									vstrand = make_vdb_table();
+								}
 								rei();
 								break;
 							}
@@ -2764,8 +2819,27 @@ static void scan_db(vector<Strand> const& vdb, bool ret = 0) {
 						break;
 					case 'y':
 						if (testqqb(L"<yesno:")) {
-							int m = MessageBoxW(0, qp.substr(qp.find(' ')).c_str()
-								, qp.substr(0, qp.find(' ') + 1).c_str()
+
+							wstring me = qp;
+
+							if (npos_find(qp, '\\', 1)) {
+								me = regex_replace(me, wregex(L"[\\\\][\\s]"), L"::s::");
+							}
+
+							auto qu = me.substr(0, me.find(' '));
+							me = me.substr(me.find(' ') + 1);
+
+							if (npos_find(qp, '\\', 1)) {
+								me = regex_replace(me, wregex(L"::s::"), L" ");
+								me = regex_replace(me, wregex(L"\\\\g"), L">");
+								me = regex_replace(me, wregex(L"\\\\n"), L"\n");
+								qu = regex_replace(qu, wregex(L"::s::"), L" ");
+								qu = regex_replace(qu, wregex(L"\\\\g"), L">");
+								qu = regex_replace(qu, wregex(L"\\\\n"), L"\n");
+							}
+
+							int m = MessageBoxW(0, me.c_str()
+								, qu.c_str()
 								, MB_YESNO);
 							if (m == IDYES) {
 								rei();
@@ -2816,7 +2890,7 @@ static void scan_db(vector<Strand> const& vdb, bool ret = 0) {
 	if (RSHIFTLSHIFT_Only) rri = 0;
 	if (found_io || strand[0] && strand[strand.length() - 1] == '>') {
 		if (ccm) { close_ctrl_mode = !close_ctrl_mode; ccm = 0; }
-		strand.clear();
+		if (strand[0]) strand.clear();
 		prints();
 		stop = 0;
 	}
@@ -2832,13 +2906,10 @@ static void repeat(vector<Strand> const& vdb) {
 	switch (repeat_switch) {
 	case 0: {
 		if (strand[0]) strand.clear();
-		//kb_release(repeat_key);
-		//c = -1;
+		kb_clear(repeat_key);
 		thread thread(repeat_out, repeats, cref(vdb)); thread.detach();
-		if (show_strand)
-			wcout.flush().clear();
+		break;
 	}
-		  break;
 	case 1: //esc + p
 		printq();
 		run(L"xy~:", vdb, 1);
@@ -2885,21 +2956,31 @@ static void key(wstring k, vector<Strand> const& vdb) {
 	strand.append(k);
 
 	if (k[0] == '>' || !close_ctrl_mode) {
-		prints();
 		//scan_db(vdb);
+		if (k[0] == '>') prints();
 		thread thread(scan, cref(vdb)); thread.detach();
-		return;
+		if (k[0] == '>') clear_all_keys();
+		if (close_ctrl_mode) return;
 	}
-	else
-		clear_key(k[0]);
 
-	if (strand_length && strand[0] != '<' && strand.length() > strand_length) //strand_length mode
-		strand = strand.substr(strand[0] < 128 ? 1 : 4);
+	if (strand_length && strand[0] != '<' && k[0] != '>') {
+		if (strand.length() > strand_length && !utf_8)
+			strand = strand.substr(1);
+		else if(utf_8) {
+			size_t x = 0;
+			for (size_t i = 0; i < strand.length(); ++i) {
+				if (strand[i] > 127) {
+					++x; ++i;
+				}
+				else ++x;
+			}
+			if(x > strand_length)
+				strand = strand[0] < 127 ? strand.substr(1) : strand.substr(2);
+		}
+	}
 
-	if (strand.find('>') != string::npos)
-		strand.clear();
-
-	prints();
+	if (k[0] != '>')
+		prints();
 }
 
 #pragma endregion
@@ -2991,8 +3072,7 @@ RgbScaleLayout			1.00
 			if (!strand[0]) { if (rri) rri = 0; continue; }
 
 			if (utf_8 && strand[strand.length() - 1] > 127) {
-				strand = strand.substr(0, strand.length() - 4);
-				wcout.flush().clear();
+				strand = strand.substr(0, strand.length() - 2);
 			}
 			else
 				strand = strand.substr(0, strand.length() - 1);
@@ -3012,8 +3092,8 @@ RgbScaleLayout			1.00
 							sleep(frequency / 4);
 						sleep(1);
 					}
-					if (strand[0] && strand != L"<") { key(L">", vdb); ex = 1; break; }
-					else if (x > 1) strand = L"<";
+					if (x > 1) strand = x == 2 ? L"<" : L"";
+					else if (strand[0] && strand != L"<") { key(L">", vdb); ex = 1; break; }
 					else if (!strand[0]) { strand = RSHIFTLSHIFT_Only > 1 && rri == 1 ? L"" : L"<"; }
 					else if (RSHIFTLSHIFT_Only > 1) strand = L"";
 					else strand = strand[0] == '<' ? L"" : L"<";
@@ -3021,7 +3101,7 @@ RgbScaleLayout			1.00
 				}
 				if (GetAsyncKeyState(cKey) && RSHIFTCtrlKeyToggle) { //rshift + cKey
 					if (min > RSHIFTCtrlKeyToggle) { ex = 1; break; }
-					if (cKey == VK_SPACE) kb(VK_BACK);
+					if (cKey == VK_SPACE) { kb(VK_BACK); kb_clear(VK_BACK); }
 					close_ctrl_mode = !close_ctrl_mode;
 					ccm = !ccm;
 					ex = 1; break;
@@ -3041,7 +3121,7 @@ RgbScaleLayout			1.00
 						++min;
 						if (GetAsyncKeyState(cKey)) { //lshift + ctrlKey
 							if (min > LSHIFTCtrlKey) { sleep(frequency / 4); continue; }
-							if (cKey == VK_SPACE) kb(VK_BACK);
+							if (cKey == VK_SPACE) { kb(VK_BACK); kb_clear(VK_BACK); }
 							clear_all_keys();
 							strand = strand[0] == '<' ? L"<" : L"";
 							prints();
@@ -3108,7 +3188,7 @@ RgbScaleLayout			1.00
 			if (RSHIFTLSHIFT_Only && !strand[0] && !rri) continue;
 			if (min > cKeyMax) {}
 			else {
-				if (cKey == VK_SPACE) kb(VK_BACK);
+				if (cKey == VK_SPACE) { kb(VK_BACK); kb_clear(VK_BACK); }
 				if (!strand[0]) strand = L"<";
 				else {
 					if (strand[0] && strand != L"<") { key(L">", vdb); continue; }
@@ -3124,8 +3204,9 @@ RgbScaleLayout			1.00
 		if (GetAsyncKeyState(repeat_key)) {
 			//while (GetAsyncKeyState(repeat_key) != 0) 
 			//	sleep(frequency / 4);
-			if (auto_bs_repeat_key)
-				kb(VK_BACK);
+			if (auto_bs_repeat_key) {
+				kb(VK_BACK); kb_clear(VK_BACK);
+			}
 			repeat(vdb);
 			continue;
 		}
@@ -3140,25 +3221,25 @@ RgbScaleLayout			1.00
 
 		if (GetAsyncKeyState(VK_ESCAPE)) {
 			GetAsyncKeyState('P'); if (GetAsyncKeyState('P')) { //p + esc: <xy:>
-				kb_release(VK_ESCAPE); kb(VK_BACK);
+				kb_release(VK_ESCAPE); kb(VK_BACK); kb_clear(VK_BACK);
 				repeat_switch = 1;
 				repeat(vdb);
 				continue;
 			}
 			GetAsyncKeyState('R'); if (GetAsyncKeyState('R')) { //r + esc: <rgb:>
-				kb_release(VK_ESCAPE); kb(VK_BACK);
+				kb_release(VK_ESCAPE); kb(VK_BACK); kb_clear(VK_BACK);
 				repeat_switch = 2;
 				repeat(vdb);
 				continue;
 			}
 			GetAsyncKeyState('G'); if (GetAsyncKeyState('G')) { //g + esc: <RGB~:> to cb
-				kb_release(VK_ESCAPE); kb(VK_BACK);
+				kb_release(VK_ESCAPE); kb(VK_BACK); kb_clear(VK_BACK);
 				repeat_switch = 3;
 				repeat(vdb);
 				continue;
 			}
 			GetAsyncKeyState('A'); if (GetAsyncKeyState('A')) { //a + esc: <app:>
-				kb_release(VK_ESCAPE); kb(VK_BACK);
+				kb_release(VK_ESCAPE); kb(VK_BACK); kb_clear(VK_BACK); sleep(frequency);
 				run(L"<alt><esc><alt->", vdb);
 				wstring t = getAppT();
 				run(L"<,><shift><alt><esc><alt-><shift->", vdb);
@@ -3167,31 +3248,32 @@ RgbScaleLayout			1.00
 				continue;
 			}
 			GetAsyncKeyState(VK_OEM_PLUS); if (GetAsyncKeyState(VK_OEM_PLUS)) { //= + esc: repeat
-				kb_release(VK_ESCAPE); kb(VK_BACK);
+				kb_release(VK_ESCAPE); kb(VK_BACK); kb_clear(VK_BACK);
 				repeat(vdb); continue;
 			}
 			GetAsyncKeyState(VK_OEM_COMMA); if (GetAsyncKeyState(VK_OEM_COMMA)) { //, + esc
-				short x = 0;
+				unsigned short x = 0;
 				while (GetAsyncKeyState(VK_OEM_COMMA) != 0) {
 					if (GetAsyncKeyState(VK_ESCAPE)) {
-						if (!x) kb(VK_BACK); //, + esc (esc)
+						if (!x) { kb(VK_BACK); kb_clear(VK_BACK); } //, + esc (esc)
 						++x;
 					}
 					while (GetAsyncKeyState(VK_ESCAPE) != 0)
 						sleep(1);
+
 					sleep(1);
 				}
 				if (RSHIFTLSHIFT_Only) ++rri;
-				if (strand[0] && strand != L"<") { key(L">", vdb); continue; }
-				else if (x > 1) strand = L"<";
-				else if (!strand[0]) { strand = RSHIFTLSHIFT_Only > 1 && rri == 1 ? L"" : L"<"; }
+				if (x > 1) strand = x == 2 ? L"<" : L"";
+				else if (strand[0] && strand != L"<") { key(L">", vdb); continue; }
+				else if (!strand[0]) { strand = (RSHIFTLSHIFT_Only > 1 && rri == 1) ? L"" : L"<"; }
 				else if (RSHIFTLSHIFT_Only > 1) strand = L"";
 				else strand = strand[0] == '<' ? L"" : L"<";
 				prints(); clear_all_keys();
 				continue;
 			}
 			GetAsyncKeyState('L'); if (GetAsyncKeyState('L')) { //L + esc
-				kb(VK_BACK);
+				kb(VK_BACK); kb_clear(VK_BACK);
 				static unsigned short escL = RSHIFTLSHIFT_Only;
 				if (RSHIFTLSHIFT_Only) RSHIFTLSHIFT_Only = 0;
 				else RSHIFTLSHIFT_Only = escL ? escL : 2;
@@ -3203,14 +3285,14 @@ RgbScaleLayout			1.00
 				kb(VK_BACK); return 0;
 			}
 			GetAsyncKeyState('H'); if (GetAsyncKeyState('H')) { //h + esc
-				kb_release(VK_ESCAPE); kb(VK_BACK);
+				kb_release(VK_ESCAPE); kb(VK_BACK); kb_clear(VK_BACK);
 				sleep(1);
 				toggle_visibility();
 				prints();
 				continue;
 			}
 			GetAsyncKeyState(VK_OEM_2); if (GetAsyncKeyState(VK_OEM_2)) { //? + esc
-				kb_release(VK_ESCAPE); kb(VK_BACK);
+				kb_release(VK_ESCAPE); kb(VK_BACK); kb_clear(VK_BACK);
 				print_ctrls();
 				ShowWindow(GetConsoleWindow(), SW_RESTORE);
 				SetForegroundWindow(GetConsoleWindow());
@@ -3226,7 +3308,7 @@ RgbScaleLayout			1.00
 
 #pragma region input_strand
 		if (!ignoreAZ) {
-			if (Kb_Key_A[0] && GetAsyncKeyState(0x41)) { key(Kb_Key_A, vdb); continue; }
+			if (Kb_Key_A[0] && GetAsyncKeyState(0x41)/* & 0x8000*/) { key(Kb_Key_A, vdb); continue; }
 			if (Kb_Key_B[0] && GetAsyncKeyState(0x42)) { key(Kb_Key_B, vdb); continue; }
 			if (Kb_Key_C[0] && GetAsyncKeyState(0x43)) { key(Kb_Key_C, vdb); continue; }
 			if (Kb_Key_D[0] && GetAsyncKeyState(0x44)) { key(Kb_Key_D, vdb); continue; }
@@ -3355,6 +3437,19 @@ RgbScaleLayout			1.00
 			continue;
 		}
 #pragma endregion
+
+		if (mvdb) { //vdb size has changed. mvdb.
+			vdb = vstrand;
+		
+			if (mvdb == 1) {
+				strand = L"<anu>";
+				scan_db(vdb);
+				repeats = repeats[0] ? L"<anu:>" + repeats.substr(5) : L"";
+				strand.clear();
+			}
+			
+			mvdb = 0;
+		}
 
 	}
 
