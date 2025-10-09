@@ -12,9 +12,15 @@ using namespace std;
 struct Strand
 {
 	//unsigned int line{};
-	wstring out{};
+	//wstring out{};
 	wstring in{};
 	wstring g{};
+	bool ft{};
+};
+
+struct Strand_out
+{
+	wstring out{};
 };
 
 #pragma region globals
@@ -42,6 +48,7 @@ string delimiter = ""; //°";
 double RgbScaleLayout = 1.00; //100%
 double ic = 0; //<+> icp
 vector<Strand> vstrand{};
+vector<Strand_out> vstrand_out{};
 size_t c = 0;
 int qxcc = 0, qycc = 0;
 unsigned short out_speed = 0;
@@ -72,7 +79,7 @@ bool ManualRepeat = 1;
 bool hold_shift = 0;
 bool out_sleep = 1;
 bool stop = 0;
-bool utf_8 = 1;
+bool utf_8 = 1, u8{};
 bool ccm = 0; //close_ctrl_mode toggle
 
 #pragma endregion
@@ -93,9 +100,9 @@ struct Multi_ {
 
 #pragma region protos
 static void showOutsMsg(wstring, wstring, wstring, bool),
-	run(wstring, vector<Strand> const&, bool),
-	scan_db(vector<Strand> const&, bool),
-	repeat(vector<Strand> const&),
+	run(wstring),
+	scan_db(bool),
+	repeat(),
 	clear_all_keys()
 ;
 
@@ -120,10 +127,10 @@ static std::string wstring_to_utf8(const std::wstring& wstr) {
 	return str;
 }
 
-static vector<Strand> make_vdb_table() {
+static void make_vdb_table() {
 	ifstream f(database);
 
-	if (!f) { showOutsMsg(L"", L"\\0C\\" + database + L"\\0C\\\\4 not found!\\7\\n", L"", 1); return vstrand; }
+	if (!f) { showOutsMsg(L"", L"\\0C\\" + database + L"\\0C\\\\4 not found!\\7\\n", L"", 1); return; }
 
 	f.imbue(locale("en_us.utf8")); //extract
 
@@ -131,7 +138,10 @@ static vector<Strand> make_vdb_table() {
 	string cells;
 
 	//unsigned int line{};
-	vstrand.push_back({ L"", L"", L"" }); //connect
+	if (vstrand.size() == 0) {  //blank for connect
+		vstrand.push_back({ L"", L"", 0 });
+		vstrand_out.push_back({ L"" });
+	}
 
 	while (getline(f, cells, delimiter[0])) {
 
@@ -139,9 +149,10 @@ static vector<Strand> make_vdb_table() {
 
 		if (delimiter[0] != '\n')
 			if (delimiter[0] > 127)
-				cell = cell.substr(0, cell.length() - 1);
+				cell.pop_back();
 
 		Strand s{};
+		Strand_out s_o{};
 
 		//s.line = line;
 
@@ -156,20 +167,20 @@ static vector<Strand> make_vdb_table() {
 				if (s.g[0] && s.g[0] != '>') s.g += cell[s.in.length() + 1] == '>' ? L">" : L"";
 			}
 
-			s.out = cell.substr(s.in.length() + s.g.length());
+			s_o.out = cell.substr(s.in.length() + s.g.length());
+			if (!s_o.out[0]) s.ft = 1;
 
 			if (s.in[0] == '<')
 				s.in += s.g;
 		}
 
 		vstrand.push_back(s);
+		vstrand_out.push_back(s_o);
 
 		//++line;
 
 	}
 	f.close();
-
-	return vstrand;
 }
 
 static wstring getTime(wstring& w) {
@@ -252,14 +263,13 @@ static void showOutsMsg(wstring s, wstring w, wstring s1 = L"", bool make_color 
 		wcout << w;
 		++x; t = 1;
 		};
-	auto color = [&x, &t, &w, hC, &make_color](WORD n) {
+	auto color = [&x, &t, &w, &hC, &make_color](WORD n) {
 		if (make_color) SetConsoleTextAttribute(hC, n);
 		if (!make_color) wcout << w.substr(x, 2);
 		++x; t = 1;
 		if (w[x] == '\\') --x;
 		};
 	if (s[0]) wcout << s;
-	if (utf_8) { kb(VK_ESCAPE); GetAsyncKeyState(VK_ESCAPE); } //hack
 	for (; x < w.length(); ++x) {
 		if (w[x] == '\\') {
 			t = 0;
@@ -337,6 +347,11 @@ static void showOutsMsg(wstring s, wstring w, wstring s1 = L"", bool make_color 
 	if (s1[0]) wcout << s1;
 }
 
+static void call_utf8() {
+	u8 = 1;
+	wcout.imbue(locale(wcout.getloc(), new codecvt_utf8_utf16<wchar_t>));
+}
+
 static void load_settings() {
 	ifstream f(settings);
 	f.imbue(locale("en_US.utf8"));
@@ -362,7 +377,21 @@ static void load_settings() {
 		case 545://Debug:
 		{ if (v == L"0" || v == L"1" || v == L"2") debug = stoi(v); else er(); } break;
 		case 353://UTF8:
-		{ if (se == L"UTF8:") { if (v == L"0" || v == L"1") if (v == L"1" && !utf_8) { wcout.flush().clear(); num_error(L"Reload program for", L"1", L"UTF_8:"); } utf_8 = stoi(v); } else er(); } break;
+		{
+			if (se == L"UTF8:") {
+				if (v == L"0" || v == L"1") {
+					utf_8 = stoi(v);
+					if (v == L"0") continue;
+					
+					if (u8)
+						num_error(L"Reload program for", L"1", L"UTF_8:");
+					else
+						call_utf8();
+				}
+				else er();
+			}
+			break;
+		}
 		case 1536://RSHIFT+LSHIFT_Only:
 		{ if (check_if_num(v) > L"") { RSHIFTLSHIFT_Only = stoi(v); rri = 0; } else er(); } break;
 		case 1261://LSHIFT+CtrlKey:
@@ -640,11 +669,12 @@ static void load_settings() {
 		{ if (v == L"0" || v == L"1") ignoreNumPad = stoi(v); else er(); } break;
 
 		}
-		if (Kb_Key_Print_Screen[0] || Kb_Key_Space[0] || Kb_Key_Tab[0] || Kb_Key_Left_Shift[0] || Kb_Key_Right_Shift[0] || Kb_Key_Left_Ctrl[0] || Kb_Key_Right_Ctrl[0] || Kb_Key_Enter[0] || Kb_Key_Caps[0] || Kb_Key_Grave_Accent[0] || Kb_Key_Minus[0] || Kb_Key_Equal[0] || Kb_Key_Left_Bracket[0] || Kb_Key_Right_Bracket[0] || Kb_Key_Backslash[0] || Kb_Key_Semicolon[0] || Kb_Key_Quote[0] || Kb_Key_Comma[0] || Kb_Key_Period[0] || Kb_Key_Forwardslash[0] || Kb_Key_Menu[0] || Kb_Key_Insert[0] || Kb_Key_Delete[0] || Kb_Key_Home[0] || Kb_Key_End[0] || Kb_Key_PgUp[0] || Kb_Key_PgDn[0])
-			ignoreOtherKeys = 0;
-		else
-			ignoreOtherKeys = 1;
 	}
+
+	if (Kb_Key_Print_Screen[0] || Kb_Key_Space[0] || Kb_Key_Tab[0] || Kb_Key_Left_Shift[0] || Kb_Key_Right_Shift[0] || Kb_Key_Left_Ctrl[0] || Kb_Key_Right_Ctrl[0] || Kb_Key_Enter[0] || Kb_Key_Caps[0] || Kb_Key_Grave_Accent[0] || Kb_Key_Minus[0] || Kb_Key_Equal[0] || Kb_Key_Left_Bracket[0] || Kb_Key_Right_Bracket[0] || Kb_Key_Backslash[0] || Kb_Key_Semicolon[0] || Kb_Key_Quote[0] || Kb_Key_Comma[0] || Kb_Key_Period[0] || Kb_Key_Forwardslash[0] || Kb_Key_Menu[0] || Kb_Key_Insert[0] || Kb_Key_Delete[0] || Kb_Key_Home[0] || Kb_Key_End[0] || Kb_Key_PgUp[0] || Kb_Key_PgDn[0])
+		ignoreOtherKeys = 0;
+	else
+		ignoreOtherKeys = 1;
 	f.close();
 	clear_all_keys();
 }
@@ -854,7 +884,7 @@ static void printq() {
 	shift_release();
 }
 
-static void sleep(unsigned short ms) {
+static void sleep(unsigned long ms) {
 	this_thread::sleep_for(chrono::milliseconds(ms));
 }
 
@@ -936,38 +966,35 @@ static void setQxQy(wstring x, size_t z = 0) {
 }
 
 static wstring loadVar(wstring q = L"") {
-	ifstream f(replacerDb); if (!f) { showOutsMsg(L"", L"\\n\\4ReplacerDb \\7\\0C\\" + replacerDb + L"\\0C\\\\4 not found!\\7\\n", L"", 1); return q; }
-	string cells; wstring cell, se; GetAsyncKeyState(VK_ESCAPE); while (getline(f, cells, delimiter[0])) {
-		cell = utf8_to_wstring(cells);
-		if (GetAsyncKeyState(VK_ESCAPE) || cell.substr(0, 4) == L"<'''") break;
-		if (!cell[0] || cell[0] == '\n' || cell[0] == ' ') continue;
-		se = cell.substr(0, q.length());
-		if (se == q) {
-			wstring v = cell.substr(q.length());
-			q = v;
-			f.close();
-			return q;
-		}
+	if (q[0] != '<') {
+		if (q[q.length() - 1] == '>')
+			q.pop_back();
+		if (q[q.length() - 1] == ':' || q[q.length() - 1] == '-' || q[q.length() - 1] == ' ')
+			q.pop_back();
 	}
-	q.clear();
-	f.close();
-	return q;
+
+	for (size_t i = 0; i < vstrand.size(); ++i)
+		if (vstrand.at(i).in == q)
+			return vstrand_out.at(i).out;
+
+	return L"";
 }
 
 static wstring isVar(wstring& q) { // Replacer | {var} {var:} {var-} {var>} | <r:>
 	if (!replacerDb[0]) return q;
-	if (q.find('{') != string::npos) {
+	if (q.find('{') != string::npos && q.find('}') != string::npos) {
 		wstring tqg = q, tq{};
 		GetAsyncKeyState(VK_ESCAPE);
 		while (tqg.find('{') != string::npos) {
 			if (GetAsyncKeyState(VK_ESCAPE)) break;
-			q = q.substr(q.find('{') + 1, q.find(L'}', q.find('{')) - q.find('{') - 1); tq = q;
-			if (q > L"") {
-				if (delimiter[0] != '\n') { q = regex_replace(q, wregex(L"\n"), L""); q = regex_replace(q, wregex(L"\t"), L""); }
+			q = q.substr(q.find('{') + 1);
+			q = q.substr(0, q.find(L'}'));
+			tq = q;
+			if (q[0]) {
 				if (q[0] == '\'' && q != L"'") { tqg.replace(tqg.find('{'), 2 + q.length(), L""); q = tqg; continue; } //{'ignore}
 				q = loadVar(q);
 			}
-			if (q == L"") {
+			if (!q[0]) {
 				tqg.replace(tqg.find('{'), 1, L"::_::"); q = tqg;
 				continue;
 			}
@@ -990,36 +1017,31 @@ static wstring isVar(wstring& q) { // Replacer | {var} {var:} {var-} {var>} | <r
 			tqg = regex_replace(tqg, wregex(L"\\{" + tq + L"\\}"), q);
 			q = tqg;
 		}
-		tqg = regex_replace(tqg, wregex(L"::_::"), L"{"); tqg = regex_replace(tqg, wregex(L":s:_:s:"), L"$"); q = tqg;
+		tqg = regex_replace(tqg, wregex(L"::_::"), L"{"); tqg = regex_replace(tqg, wregex(L":s:_:s:"), L"$");
+		q = tqg;
 	}
 	return q;
 }
 
 static wstring connect(wstring& w, bool bg = 0) {
-	bool con = 0;
+	bool con{};
 	wstring qqs = qq.substr(0, qq.find('>') + 1);
 	if (bg) { qqs = qq + L">"; con = 1; }
-	if (qqs.find(' ') != string::npos
-		|| qqs.find(':') != string::npos
-		|| qqs.find('-') != string::npos
-		) {
-		wstring s = qqs.substr(qqs.length() - 2, 2);
-		if (
-			s == L" >"
-			|| s == L":>"
-			|| s == L"->"
-			) {
+
+	if (qqs.find('>') != string::npos) {
+		wchar_t s = qqs[qqs.length() - 2];
+		if (s == ' ' || s == ':' || s == '-')
 			con = 1;
-		}
 	}
+
 	if (con) {
-		vstrand.at(0).out.clear();
+		vstrand_out.at(0).out.clear();
 		strand = qqs;
-		scan_db(vstrand, 1);
+		scan_db(1);
 		strand.clear();
-		if (vstrand.at(0).out[0]) {
-			if (delimiter[0] != '\n') { vstrand.at(0).out = regex_replace(vstrand.at(0).out, wregex(L"\n"), L""); vstrand.at(0).out = regex_replace(vstrand.at(0).out, wregex(L"\t"), L""); }
-			wstring x = vstrand.at(0).out,
+		if (vstrand_out.at(0).out[0]) {
+			if (delimiter[0] != '\n') { vstrand_out.at(0).out = regex_replace(vstrand_out.at(0).out, wregex(L"\n"), L""); vstrand_out.at(0).out = regex_replace(vstrand_out.at(0).out, wregex(L"\t"), L""); }
+			wstring x = vstrand_out.at(0).out,
 				xx = qq.substr(qqs.length() - bg);
 			if (bg)	return x;
 			w = x + xx;
@@ -1180,7 +1202,7 @@ Link and continue. Use <
 <ifapp~:t, 1, 1, <t: <f:><'1>
 
 Use , in false slot for retry
-<ifapp~:'t,1,1,<t: ,><<:1>
+<ifapp~:'t,1,1,<t: ,><:1>
 
 Use ' before the closing > for final ms delay (optional)
 
@@ -1189,7 +1211,7 @@ Use ' before the closing > for final ms delay (optional)
 <f:><'\Rfalse\W>
 
 Print to console:
-<<:x\n>	Custom message        
+<:x\n>	Custom message
 <'x>	Auto newline
 <' x>	No print. Use SPACE
 		
@@ -1337,7 +1359,6 @@ static wstring getRGB(bool bg = 0) {
 
 				if (check_if_num(ms, L"<rgb {slot}>") == L"") {
 					c = out.length();
-					//out = repeats;
 					return L"";
 				}
 
@@ -1434,7 +1455,7 @@ static void if_esc_pause(Multi_ multi_) {
 	}
 }
 
-static void multi_sleep(Multi_ multi_, unsigned short ms, unsigned short n = 1) {
+static void multi_sleep(Multi_ multi_, unsigned long ms, unsigned long n = 1) {
 	if (ms > 0) {
 		multi_.out_ = out;
 		multi_.qq_ = qq;
@@ -1466,7 +1487,6 @@ static inline void clear_key(wchar_t key) {
 	else {
 		auto x = 0;
 		switch (key) {
-		case '\b': x = 8; break;
 		case ' ': x = 32; break;
 		case '"':
 		case '\'': x = 39; break;
@@ -1515,28 +1535,28 @@ static inline void clear_key(wchar_t key) {
 	}
 }
 
-static void scan_db(vector<Strand> const& vdb, bool ret = 0) {
+static void scan_db(bool ret = 0) {
 
 	bool fallthrough_ = 0, found_io = 0;
 
-	for (size_t i = 0; i < vdb.size(); ++i)
+	for (size_t i = 0; i < vstrand.size(); ++i)
 	{
 		//return_connect
-		if (ret && vdb.at(i).in[0] != '<')
+		if (ret && vstrand.at(i).in[0] != '<')
 			continue;
 
 		if (repeats[0] == '>'
 			|| fallthrough_
-			|| close_ctrl_mode && vdb.at(i).in == strand.substr(0, strand.length() - 1 + ret)
-			|| vdb.at(i).in[0] == '<' &&
-				vdb.at(i).in.substr(0, vdb.at(i).in.length() - vdb.at(i).g.length())
+			|| close_ctrl_mode && vstrand.at(i).in == strand.substr(0, strand.length() - 1 + ret)
+			|| vstrand.at(i).in[0] == '<' &&
+				vstrand.at(i).in.substr(0, vstrand.at(i).in.length() - vstrand.at(i).g.length())
 				== strand.substr(0, strand.length() - 1 + ret)
-			|| !close_ctrl_mode && vdb.at(i).in == strand
-			|| !close_ctrl_mode && vdb.at(i).in == strand + vdb.at(i).g
+			|| !close_ctrl_mode && vstrand.at(i).in == strand
+			|| !close_ctrl_mode && vstrand.at(i).in == strand + vstrand.at(i).g
 			) {
 
 			if (ret) {
-				vstrand.at(0).out = vdb.at(i).out;
+				vstrand_out.at(0).out = vstrand_out.at(i).out;
 				return;
 			}
 
@@ -1551,28 +1571,27 @@ static void scan_db(vector<Strand> const& vdb, bool ret = 0) {
 				repeat_switch = 0;
 
 				//fallthrough
-				if (fallthrough_ && vdb.at(i).out[0]) fallthrough_ = 0;
-				if (fallthrough_ && !vdb.at(i).in[0]) return;
-				if (!vdb.at(i).out[0]) { fallthrough_ = 1; continue; }
+				if (fallthrough_ && !vstrand.at(i).ft) fallthrough_ = 0;
+				if (fallthrough_ && !vstrand.at(i).in[0]) return;
+				if (vstrand.at(i).ft) { fallthrough_ = 1; continue; }
 
 				//backspace input depending on g and set repeat and input accordingly
-				switch (vdb.at(i).g[0])
+				switch (vstrand.at(i).g[0])
 				{
 				case '>':
-					repeats = vdb.at(i).in + vdb.at(i).out;
-					out = vdb.at(i).out;
+					repeats = vstrand.at(i).in + vstrand_out.at(i).out;
+					out = vstrand_out.at(i).out;
 					break;
 					//case ' ':
 					//case '-':
 				default:
 					for (size_t n = 0; n < strand.length(); ++n) {
-						wchar_t x = strand[n];
-						if (x == '<') continue;
-						bs_input(x);
+						if (strand[n] == '<') continue;
+						bs_input(strand[n]);
 					}
 					[[fallthrough]];
 				case ':':
-					out = repeats = vdb.at(i).out;
+					out = repeats = vstrand_out.at(i).out;
 				}
 
 			}
@@ -1618,7 +1637,8 @@ static void scan_db(vector<Strand> const& vdb, bool ret = 0) {
 					}
 					switch (qq[1]) {
 					case '<':
-						if (testqqb(L"<<:")) {//cout
+					case ':':
+						if (testqqb(L"<:") || testqqb(L"<<:")) {//cout
 							showOutsMsg(L"", qp, L"", 1);
 							rei();
 							break;
@@ -1659,7 +1679,7 @@ static void scan_db(vector<Strand> const& vdb, bool ret = 0) {
 
 									if (multi_.store_[0]) { //!!! run
 										multi_.c_ = c;
-										repeat(vdb);
+										repeat();
 										sleep(1);
 										out = multi_.store_.substr(multi_.c_);
 										c = 0;
@@ -1739,11 +1759,11 @@ static void scan_db(vector<Strand> const& vdb, bool ret = 0) {
 						if (qqb(L"<,") && qq[2] != ':' && qq[2] != '-') { //<,#>
 							qx = qq.substr(2);
 							qx = qx.substr(0, qx.find('>'));
-							unsigned short n = 1;
+							unsigned long n = 1;
 							if (qx.find(' ') != string::npos) {
 								setQxQy(qx);
 								if (check_if_num(qy, L"<,# #>") == L"") return;
-								n = stoi(qy); //<,1000 4>
+								n = stoul(qy); //<,1000 4>
 							}
 							if (!qx[0]) qx = to_wstring(frequency); //default <,>
 							//if (qx[0] < '0' || qx[0] > '9' || n == 0) { //<,1000>
@@ -1751,7 +1771,7 @@ static void scan_db(vector<Strand> const& vdb, bool ret = 0) {
 								rei(); return;
 							}
 
-							unsigned short ms = stoi(qx);
+							unsigned long ms = stoul(qx);
 
 							multi_sleep(multi_, ms, n);
 
@@ -1765,7 +1785,8 @@ static void scan_db(vector<Strand> const& vdb, bool ret = 0) {
 							if (show_strand) {
 								if (qq[2] != ' ') {
 									wstring v = qq.substr(2, qq.find('>') - 2);
-									showOutsMsg(L"", v, L"\n", 1);
+									showOutsMsg(L"", v, L"", 1);
+									cout << '\n';
 								}
 							}
 							rei();
@@ -1852,17 +1873,16 @@ static void scan_db(vector<Strand> const& vdb, bool ret = 0) {
 								wifstream f(qp); if (!f) { showOutsMsg(L"", L"\\n\\4Database \\7\\0C\\" + qp + L"\\0C\\\\4 not found!\\7\\n", L"", 1); return; }
 								rei();
 								//append db
-								wstring t = qp;
+								wstring t = database;
 								database = qp;
-								mvdb = 2;
-								vstrand = make_vdb_table();
+								make_vdb_table();
 								database = t;
 								break;
 							}
 							else if (qqb(L"<db>")) { 
-								for (size_t i = 0; i < vdb.size(); ++i) {
-									auto in_ = vdb.at(i).in[0] && vdb.at(i).in[vdb.at(i).in.length() - 1] == '>' ? L"" : vdb.at(i).g;
-									wcout << i << L": " << vdb.at(i).in << in_ << vdb.at(i).out << L"\n";
+								for (size_t i = 0; i < vstrand.size(); ++i) {
+									wstring in_ = vstrand.at(i).in[0] && vstrand.at(i).in[vstrand.at(i).in.length() - 1] == '>' ? L"" : vstrand.at(i).g;
+									wcout << i << L": " << vstrand.at(i).in << in_ << vstrand_out.at(i).out << L"\n";
 								}
 								rei();
 							}
@@ -1995,7 +2015,7 @@ static void scan_db(vector<Strand> const& vdb, bool ret = 0) {
 
 								if (qp.substr(qp.length() - 1, 1) == L"'") {
 									sleeper_tick = 1;
-									qp = qp.substr(0, qp.length() - 1);
+									qp.pop_back();
 								}
 
 								t = qp;
@@ -2145,27 +2165,27 @@ static void scan_db(vector<Strand> const& vdb, bool ret = 0) {
 								}
 								else p.push_back(a);
 
-								unsigned short x_times{};
+								unsigned long x_times{};
 								if (x[0]) {
 									if (check_if_num(x, L"* slot") == L"")
 										break;
-									else x_times = stoi(x);
+									else x_times = stoul(x);
 								}
 								else x_times = 1;
 
-								unsigned short ms_milliseconds{}, n = 1;
+								unsigned long ms_milliseconds{}, n = 1;
 								if (ms[0]) {
 									if (npos_find(ms, ' ', 1)) { //set ms_milliseconds
 										t = ms.substr(0, ms.find(' ')); //1000 4
 										if (check_if_num(t) == L"") { num_error(L"ms slot", t); break; }
-										else ms_milliseconds = stoi(t);
+										else ms_milliseconds = stoul(t);
 										t = ms.substr(ms.find(' ') + 1);
 										if (check_if_num(t) == L"") { num_error(L"ms n slot", t); break; }
-										else n = stoi(t);
+										else n = stoul(t);
 									}
 									else
 										if (check_if_num(ms, L"ms slot") == L"") break;
-										else ms_milliseconds = stoi(ms);
+										else ms_milliseconds = stoul(ms);
 								}
 								else ms_milliseconds = 0;
 #pragma endregion
@@ -2530,7 +2550,7 @@ static void scan_db(vector<Strand> const& vdb, bool ret = 0) {
 						case 'l':
 							if (qqb(L"<ml>")) {//print multiLineDelimiter
 								wstring w = repeats;
-								run(utf8_to_wstring(delimiter), vdb, 1);
+								run(utf8_to_wstring(delimiter));
 								repeats = w;
 								rei();
 								if (out_speed > 0) out_sleep = 0;
@@ -2670,11 +2690,8 @@ static void scan_db(vector<Strand> const& vdb, bool ret = 0) {
 								se = settings.substr(settings.find_last_of('\\') + 1) + L" - ";
 								wstring db_ = database;
 								load_settings();
-								if (db_ != database) {
+								if (db_ != database)
 									mvdb = 1;
-									vstrand.clear();
-									vstrand = make_vdb_table();
-								}
 								rei();
 								break;
 							}
@@ -2856,60 +2873,70 @@ static void scan_db(vector<Strand> const& vdb, bool ret = 0) {
 	}
 }
 
-static void repeat_out(wstring ai, vector<Strand> const& vdb) {
+static void run(wstring ai) {
 	repeats = L">" + ai;
 	if (repeats != L">")
-		scan_db(vdb);
+		scan_db();
 }
 
-static void repeat(vector<Strand> const& vdb) {
+static void repeat() {
 	switch (repeat_switch) {
 	case 0: {
+		if (repeat_key == VK_PAUSE) { kb(VK_CANCEL); GetAsyncKeyState(VK_CANCEL); }
 		if (strand[0]) strand.clear();
-		thread thread(repeat_out, repeats, cref(vdb));
+		thread thread(run, repeats);
 		thread.detach();
 		break;
 	}
-	case 1: //esc + p
-		printq();
-		run(L"xy~:", vdb, 1);
-		run(getXY(), vdb, 1);
-		break;
+	case 1: { //esc + p
+		bool s = show_strand; show_strand = 0;
 
+		printq();
+		run(L"xy~:");
+		run(getXY());
+
+		show_strand = s;
+		prints();
+		break;
+	}
 	case 2: //esc + r
 		printq();
-		run(getRGB(), vdb, 1);
+		run(getRGB());
 		break;
 
 	case 3: //esc + g
 		qq.clear();
 		getRGB(1);
+		if (strand[0]) strand.clear();
+		prints();
 		break;
 	
-	case 4: //esc + a
+	case 4: { //esc + a
+		bool s = show_strand; show_strand = 0;
+
 		sleep(frequency / 2);
-		run(L"<alt><esc><alt->", vdb, 1);
+		run(L"<alt><esc><alt->");
 		wstring t = getAppT();
-		run(L"<,><shift><alt><esc><alt-><shift->", vdb, 1);
+		run(L"<,><shift><alt><esc><alt-><shift->");
 		printq();
-		run(L"ifapp~:" + t + (Loop_Insert_Text > L"" ? Loop_Insert_Text : L">"), vdb, 1);
+		run(L"ifapp~:" + t + (Loop_Insert_Text > L"" ? Loop_Insert_Text : L">"));
 		repeat_switch = 4;
+
+		show_strand = s;
+		prints();
 		break;
+	}
+	
+	//case 5:
+	//	break;
 	}
 }
 
-static void run(wstring w, vector<Strand> const& vdb, bool clear = 1) {
-	repeats = L">" + w;
-	scan_db(vdb);
-	strand.clear();
-	if (clear) repeats.clear();
+static void scan() {
+	scan_db();
 }
 
-static void scan(vector<Strand> const& vdb) {
-	scan_db(cref(vdb));
-}
-
-static void key(wstring k, vector<Strand> const& vdb) {
+static void key(wstring k) {
 
 	if (k[0] == '>') { //Kb_Key_F2 = ">"
 		if (!strand[0]) k[0] = '<';
@@ -2925,9 +2952,9 @@ static void key(wstring k, vector<Strand> const& vdb) {
 	strand.append(k);
 
 	if (k[0] == '>' || !close_ctrl_mode) {
-		//scan_db(vdb);
+		//scan_db();
 		if (k[0] == '>') prints();
-		thread thread(scan, cref(vdb)); thread.detach();
+		thread thread(scan); thread.detach();
 		if (k[0] == '>') clear_all_keys();
 		if (close_ctrl_mode) return;
 	}
@@ -2984,7 +3011,7 @@ int main() {
 					if (GetAsyncKeyState('1') || GetAsyncKeyState(VK_NUMPAD1)) { num = 1; break; }
 				}
 				if (num) {
-					db_ = LR"(<anu><'\012\                                          __   .__  \n_____    ____  __ __  ____   ____ _____  |  | _|__| \n\__  \  /    \|  |  \/    \ /    \\__   \ |  |/ /  | \n / __ \|   |  \  |  /   |  \   |  \/ __ \|    <|  | \n(____  /___|  /____/|___|  /___|  (____  /__|_ \__| \n     \/     \/           \/     \/     \/     \/    \7><'\nWELCOME! [\T] [\012\?+ESC\W]><db >
+					db_ = LR"(<anu><:\04\                                          __   .__  \n_____    ____  __ __  ____   ____ _____  |  | _|__| \n\__  \  /    \|  |  \/    \ /    \\__   \ |  |/ /  | \n / __ \|   |  \  |  /   |  \   |  \/ __ \|    <|  | \n(____  /___|  /____/|___|  /___|  (____  /__|_ \__| \n     \/     \/           \/     \/     \/     \/    \7><:\nWELCOME! [\T] [\012\?+ESC\W\n]><db >
 
 db
 <db ><wr:>c:\anu\db.txt<enter>
@@ -3018,7 +3045,7 @@ RgbScaleLayout			1.00
 	SetConsoleOutputCP(CP_UTF8);
 
 	if (utf_8)
-		wcout.imbue(locale(wcout.getloc(), new codecvt_utf8_utf16<wchar_t>));
+		call_utf8();
 
 	delimiter = wstring_to_utf8(w_delimiter);
 
@@ -3027,13 +3054,16 @@ RgbScaleLayout			1.00
 
 	strand = L"<anu>";
 
-	auto vdb = make_vdb_table();
-
-	scan_db(vdb);
+	make_vdb_table();
+	
+	{
+	bool b = show_strand;
+	show_strand = 0;
+	scan_db();
+	show_strand = b;
+	}
 
 	repeats = repeats[0] ? L"<anu:>" + repeats.substr(5) : L"";
-
-	strand.clear();
 
 	for (;; this_thread::sleep_for(chrono::milliseconds(frequency))) {
 
@@ -3044,7 +3074,7 @@ RgbScaleLayout			1.00
 				strand = strand.substr(0, strand.length() - 2);
 			}
 			else
-				strand = strand.substr(0, strand.length() - 1);
+				strand.pop_back();// = strand.substr(0, strand.length() - 1);
 			prints();
 			continue;
 		}
@@ -3062,7 +3092,7 @@ RgbScaleLayout			1.00
 						sleep(1);
 					}
 					if (x > 1) strand = x == 2 ? L"<" : L"";
-					else if (strand[0] && strand != L"<") { key(L">", vdb); ex = 1; break; }
+					else if (strand[0] && strand != L"<") { key(L">"); ex = 1; break; }
 					else if (!strand[0]) { strand = RSHIFTLSHIFT_Only > 1 && rri == 1 ? L"" : L"<"; }
 					else if (RSHIFTLSHIFT_Only > 1) strand = L"";
 					else strand = strand[0] == '<' ? L"" : L"<";
@@ -3112,28 +3142,28 @@ RgbScaleLayout			1.00
 		}
 
 		if (GetAsyncKeyState(VK_LCONTROL)) {
-			GetAsyncKeyState(83); bool ex = 0;
+			GetAsyncKeyState(83); bool ex = 0, cs = 0;
 			while (GetAsyncKeyState(VK_LCONTROL) != 0) {
 				while (GetAsyncKeyState(VK_LCONTROL) != 0) {
 					if (GetAsyncKeyState(83)) {
 						while (GetAsyncKeyState(83) != 0)
 							sleep(frequency / 3);
 						if (FindWindowW(0, (editorSe).c_str()) == GetForegroundWindow() || FindWindowW(0, (se + editor).c_str()) == GetForegroundWindow()) {
-							load_settings(); strand.clear(); prints();
+							cs = 1;
 						}
 						else if (FindWindowW(0, (editorDb).c_str()) == GetForegroundWindow() || FindWindowW(0, (db + editor).c_str()) == GetForegroundWindow()) {
-							vstrand.clear(); vdb = make_vdb_table(); strand.clear(); prints();
+							vstrand.clear(); vstrand_out.clear(); make_vdb_table(); strand.clear(); prints();
 						}
 						while (GetAsyncKeyState(VK_CONTROL) != 0) sleep(frequency / 3);
 						ex = 1; break;
 					}//lctrl+s
 					sleep(frequency / 4);
 				}
+				if (cs) { load_settings(); strand.clear(); prints(); }
 				if (ex) break;
 				sleep(frequency / 4);
 			}
 			clear_all_keys();
-			if (ex) continue;
 			continue;
 		}
 
@@ -3151,7 +3181,7 @@ RgbScaleLayout			1.00
 				if (GetAsyncKeyState(VK_ESCAPE)) continue;
 				//wstring r = L""; for (unsigned char i = 0; i < x; ++i) r += out;
 				//run(r, 0);
-				repeat(vdb);
+				repeat();
 				continue;
 			}
 			if (RSHIFTLSHIFT_Only && !strand[0] && !rri) continue;
@@ -3160,7 +3190,7 @@ RgbScaleLayout			1.00
 				if (cKey == VK_SPACE) { kb(VK_BACK); GetAsyncKeyState(VK_BACK); }
 				if (!strand[0]) strand = L"<";
 				else {
-					if (strand[0] && strand != L"<") { key(L">", vdb); continue; }
+					if (strand[0] && strand != L"<") { key(L">"); continue; }
 					if (RSHIFTLSHIFT_Only > 1) strand = L"";
 					else strand = strand[0] == '<' ? L"" : L"<";
 				}
@@ -3176,7 +3206,7 @@ RgbScaleLayout			1.00
 			if (auto_bs_repeat_key) {
 				kb(VK_BACK); GetAsyncKeyState(VK_BACK);
 			}
-			repeat(vdb);
+			repeat();
 			continue;
 		}
 
@@ -3192,30 +3222,30 @@ RgbScaleLayout			1.00
 			GetAsyncKeyState('P'); if (GetAsyncKeyState('P')) { //p + esc: <xy:>
 				kb_release(VK_ESCAPE); kb(VK_BACK); GetAsyncKeyState(VK_BACK);
 				repeat_switch = 1;
-				repeat(vdb);
+				repeat();
 				continue;
 			}
 			GetAsyncKeyState('R'); if (GetAsyncKeyState('R')) { //r + esc: <rgb:>
 				kb_release(VK_ESCAPE); kb(VK_BACK); GetAsyncKeyState(VK_BACK);
 				repeat_switch = 2;
-				repeat(vdb);
+				repeat();
 				continue;
 			}
 			GetAsyncKeyState('G'); if (GetAsyncKeyState('G')) { //g + esc: <RGB~:> to cb
 				kb_release(VK_ESCAPE); kb(VK_BACK); GetAsyncKeyState(VK_BACK);
 				repeat_switch = 3;
-				repeat(vdb);
+				repeat();
 				continue;
 			}
 			GetAsyncKeyState('A'); if (GetAsyncKeyState('A')) { //a + esc: <app:>
 				kb_release(VK_ESCAPE); kb(VK_BACK); GetAsyncKeyState(VK_BACK);
 				repeat_switch = 4;
-				repeat(vdb);
+				repeat();
 				continue;
 			}
 			GetAsyncKeyState(VK_OEM_PLUS); if (GetAsyncKeyState(VK_OEM_PLUS)) { //= + esc: repeat
 				kb_release(VK_ESCAPE); kb(VK_BACK); GetAsyncKeyState(VK_BACK);
-				repeat(vdb); continue;
+				repeat(); continue;
 			}
 			GetAsyncKeyState(VK_OEM_COMMA); if (GetAsyncKeyState(VK_OEM_COMMA)) { //, + esc
 				unsigned short x = 0;
@@ -3231,7 +3261,7 @@ RgbScaleLayout			1.00
 				}
 				if (RSHIFTLSHIFT_Only) ++rri;
 				if (x > 1) strand = x == 2 ? L"<" : L"";
-				else if (strand[0] && strand != L"<") { key(L">", vdb); continue; }
+				else if (strand[0] && strand != L"<") { key(L">"); continue; }
 				else if (!strand[0]) { strand = (RSHIFTLSHIFT_Only > 1 && rri == 1) ? L"" : L"<"; }
 				else if (RSHIFTLSHIFT_Only > 1) strand = L"";
 				else strand = strand[0] == '<' ? L"" : L"<";
@@ -3264,7 +3294,7 @@ RgbScaleLayout			1.00
 				SetForegroundWindow(GetConsoleWindow());
 				continue;
 			}
-			if (Kb_Key_Esc[0]) { kb_release(VK_ESCAPE); key(Kb_Key_Esc, vdb); }
+			if (Kb_Key_Esc[0]) { kb_release(VK_ESCAPE); key(Kb_Key_Esc); }
 			continue;
 		}
 
@@ -3274,115 +3304,115 @@ RgbScaleLayout			1.00
 
 #pragma region input_strand
 		if (!ignoreAZ) {
-			if (Kb_Key_A[0] && GetAsyncKeyState(0x41)/* & 0x8000*/) { key(Kb_Key_A, vdb); continue; }
-			if (Kb_Key_B[0] && GetAsyncKeyState(0x42)) { key(Kb_Key_B, vdb); continue; }
-			if (Kb_Key_C[0] && GetAsyncKeyState(0x43)) { key(Kb_Key_C, vdb); continue; }
-			if (Kb_Key_D[0] && GetAsyncKeyState(0x44)) { key(Kb_Key_D, vdb); continue; }
-			if (Kb_Key_E[0] && GetAsyncKeyState(0x45)) { key(Kb_Key_E, vdb); continue; }
-			if (Kb_Key_F[0] && GetAsyncKeyState(0x46)) { key(Kb_Key_F, vdb); continue; }
-			if (Kb_Key_G[0] && GetAsyncKeyState(0x47)) { key(Kb_Key_G, vdb); continue; }
-			if (Kb_Key_H[0] && GetAsyncKeyState(0x48)) { key(Kb_Key_H, vdb); continue; }
-			if (Kb_Key_I[0] && GetAsyncKeyState(0x49)) { key(Kb_Key_I, vdb); continue; }
-			if (Kb_Key_J[0] && GetAsyncKeyState(0x4A)) { key(Kb_Key_J, vdb); continue; }
-			if (Kb_Key_K[0] && GetAsyncKeyState(0x4B)) { key(Kb_Key_K, vdb); continue; }
-			if (Kb_Key_L[0] && GetAsyncKeyState(0x4C)) { key(Kb_Key_L, vdb); continue; }
-			if (Kb_Key_M[0] && GetAsyncKeyState(0x4D)) { key(Kb_Key_M, vdb); continue; }
-			if (Kb_Key_N[0] && GetAsyncKeyState(0x4E)) { key(Kb_Key_N, vdb); continue; }
-			if (Kb_Key_O[0] && GetAsyncKeyState(0x4F)) { key(Kb_Key_O, vdb); continue; }
-			if (Kb_Key_P[0] && GetAsyncKeyState(0x50)) { key(Kb_Key_P, vdb); continue; }
-			if (Kb_Key_Q[0] && GetAsyncKeyState(0x51)) { key(Kb_Key_Q, vdb); continue; }
-			if (Kb_Key_R[0] && GetAsyncKeyState(0x52)) { key(Kb_Key_R, vdb); continue; }
-			if (Kb_Key_S[0] && GetAsyncKeyState(0x53)) { key(Kb_Key_S, vdb); continue; }
-			if (Kb_Key_T[0] && GetAsyncKeyState(0x54)) { key(Kb_Key_T, vdb); continue; }
-			if (Kb_Key_U[0] && GetAsyncKeyState(0x55)) { key(Kb_Key_U, vdb); continue; }
-			if (Kb_Key_V[0] && GetAsyncKeyState(0x56)) { key(Kb_Key_V, vdb); continue; }
-			if (Kb_Key_W[0] && GetAsyncKeyState(0x57)) { key(Kb_Key_W, vdb); continue; }
-			if (Kb_Key_X[0] && GetAsyncKeyState(0x58)) { key(Kb_Key_X, vdb); continue; }
-			if (Kb_Key_Y[0] && GetAsyncKeyState(0x59)) { key(Kb_Key_Y, vdb); continue; }
-			if (Kb_Key_Z[0] && GetAsyncKeyState(0x5A)) { key(Kb_Key_Z, vdb); continue; }
+			if (Kb_Key_A[0] && GetAsyncKeyState(0x41)/* & 0x8000*/) { key(Kb_Key_A); continue; }
+			if (Kb_Key_B[0] && GetAsyncKeyState(0x42)) { key(Kb_Key_B); continue; }
+			if (Kb_Key_C[0] && GetAsyncKeyState(0x43)) { key(Kb_Key_C); continue; }
+			if (Kb_Key_D[0] && GetAsyncKeyState(0x44)) { key(Kb_Key_D); continue; }
+			if (Kb_Key_E[0] && GetAsyncKeyState(0x45)) { key(Kb_Key_E); continue; }
+			if (Kb_Key_F[0] && GetAsyncKeyState(0x46)) { key(Kb_Key_F); continue; }
+			if (Kb_Key_G[0] && GetAsyncKeyState(0x47)) { key(Kb_Key_G); continue; }
+			if (Kb_Key_H[0] && GetAsyncKeyState(0x48)) { key(Kb_Key_H); continue; }
+			if (Kb_Key_I[0] && GetAsyncKeyState(0x49)) { key(Kb_Key_I); continue; }
+			if (Kb_Key_J[0] && GetAsyncKeyState(0x4A)) { key(Kb_Key_J); continue; }
+			if (Kb_Key_K[0] && GetAsyncKeyState(0x4B)) { key(Kb_Key_K); continue; }
+			if (Kb_Key_L[0] && GetAsyncKeyState(0x4C)) { key(Kb_Key_L); continue; }
+			if (Kb_Key_M[0] && GetAsyncKeyState(0x4D)) { key(Kb_Key_M); continue; }
+			if (Kb_Key_N[0] && GetAsyncKeyState(0x4E)) { key(Kb_Key_N); continue; }
+			if (Kb_Key_O[0] && GetAsyncKeyState(0x4F)) { key(Kb_Key_O); continue; }
+			if (Kb_Key_P[0] && GetAsyncKeyState(0x50)) { key(Kb_Key_P); continue; }
+			if (Kb_Key_Q[0] && GetAsyncKeyState(0x51)) { key(Kb_Key_Q); continue; }
+			if (Kb_Key_R[0] && GetAsyncKeyState(0x52)) { key(Kb_Key_R); continue; }
+			if (Kb_Key_S[0] && GetAsyncKeyState(0x53)) { key(Kb_Key_S); continue; }
+			if (Kb_Key_T[0] && GetAsyncKeyState(0x54)) { key(Kb_Key_T); continue; }
+			if (Kb_Key_U[0] && GetAsyncKeyState(0x55)) { key(Kb_Key_U); continue; }
+			if (Kb_Key_V[0] && GetAsyncKeyState(0x56)) { key(Kb_Key_V); continue; }
+			if (Kb_Key_W[0] && GetAsyncKeyState(0x57)) { key(Kb_Key_W); continue; }
+			if (Kb_Key_X[0] && GetAsyncKeyState(0x58)) { key(Kb_Key_X); continue; }
+			if (Kb_Key_Y[0] && GetAsyncKeyState(0x59)) { key(Kb_Key_Y); continue; }
+			if (Kb_Key_Z[0] && GetAsyncKeyState(0x5A)) { key(Kb_Key_Z); continue; }
 		}
 		if (!ignore09) {
-			if (Kb_Key_0[0] && GetAsyncKeyState(0x30)) { key(Kb_Key_0, vdb); continue; }
-			if (Kb_Key_1[0] && GetAsyncKeyState(0x31)) { key(Kb_Key_1, vdb); continue; }
-			if (Kb_Key_2[0] && GetAsyncKeyState(0x32)) { key(Kb_Key_2, vdb); continue; }
-			if (Kb_Key_3[0] && GetAsyncKeyState(0x33)) { key(Kb_Key_3, vdb); continue; }
-			if (Kb_Key_4[0] && GetAsyncKeyState(0x34)) { key(Kb_Key_4, vdb); continue; }
-			if (Kb_Key_5[0] && GetAsyncKeyState(0x35)) { key(Kb_Key_5, vdb); continue; }
-			if (Kb_Key_6[0] && GetAsyncKeyState(0x36)) { key(Kb_Key_6, vdb); continue; }
-			if (Kb_Key_7[0] && GetAsyncKeyState(0x37)) { key(Kb_Key_7, vdb); continue; }
-			if (Kb_Key_8[0] && GetAsyncKeyState(0x38)) { key(Kb_Key_8, vdb); continue; }
-			if (Kb_Key_9[0] && GetAsyncKeyState(0x39)) { key(Kb_Key_9, vdb); continue; }
+			if (Kb_Key_0[0] && GetAsyncKeyState(0x30)) { key(Kb_Key_0); continue; }
+			if (Kb_Key_1[0] && GetAsyncKeyState(0x31)) { key(Kb_Key_1); continue; }
+			if (Kb_Key_2[0] && GetAsyncKeyState(0x32)) { key(Kb_Key_2); continue; }
+			if (Kb_Key_3[0] && GetAsyncKeyState(0x33)) { key(Kb_Key_3); continue; }
+			if (Kb_Key_4[0] && GetAsyncKeyState(0x34)) { key(Kb_Key_4); continue; }
+			if (Kb_Key_5[0] && GetAsyncKeyState(0x35)) { key(Kb_Key_5); continue; }
+			if (Kb_Key_6[0] && GetAsyncKeyState(0x36)) { key(Kb_Key_6); continue; }
+			if (Kb_Key_7[0] && GetAsyncKeyState(0x37)) { key(Kb_Key_7); continue; }
+			if (Kb_Key_8[0] && GetAsyncKeyState(0x38)) { key(Kb_Key_8); continue; }
+			if (Kb_Key_9[0] && GetAsyncKeyState(0x39)) { key(Kb_Key_9); continue; }
 		}
 		if (!ignoreF1s) {
-			if (Kb_Key_F1[0] && GetAsyncKeyState(0x70)) { key(Kb_Key_F1, vdb); continue; }
-			if (Kb_Key_F2[0] && GetAsyncKeyState(0x71)) { key(Kb_Key_F2, vdb); continue; }
-			if (Kb_Key_F3[0] && GetAsyncKeyState(0x72)) { key(Kb_Key_F3, vdb); continue; }
-			if (Kb_Key_F4[0] && GetAsyncKeyState(0x73)) { key(Kb_Key_F4, vdb); continue; }
-			if (Kb_Key_F5[0] && GetAsyncKeyState(0x74)) { key(Kb_Key_F5, vdb); continue; }
-			if (Kb_Key_F6[0] && GetAsyncKeyState(0x75)) { key(Kb_Key_F6, vdb); continue; }
-			if (Kb_Key_F7[0] && GetAsyncKeyState(0x76)) { key(Kb_Key_F7, vdb); continue; }
-			if (Kb_Key_F8[0] && GetAsyncKeyState(0x77)) { key(Kb_Key_F8, vdb); continue; }
-			if (Kb_Key_F9[0] && GetAsyncKeyState(0x78)) { key(Kb_Key_F9, vdb); continue; }
-			if (Kb_Key_F10[0] && GetAsyncKeyState(0x79)) { key(Kb_Key_F10, vdb); continue; }
-			if (Kb_Key_F11[0] && GetAsyncKeyState(0x7A)) { key(Kb_Key_F11, vdb); continue; }
-			if (Kb_Key_F12[0] && GetAsyncKeyState(0x7B)) { key(Kb_Key_F12, vdb); continue; }
+			if (Kb_Key_F1[0] && GetAsyncKeyState(0x70)) { key(Kb_Key_F1); continue; }
+			if (Kb_Key_F2[0] && GetAsyncKeyState(0x71)) { key(Kb_Key_F2); continue; }
+			if (Kb_Key_F3[0] && GetAsyncKeyState(0x72)) { key(Kb_Key_F3); continue; }
+			if (Kb_Key_F4[0] && GetAsyncKeyState(0x73)) { key(Kb_Key_F4); continue; }
+			if (Kb_Key_F5[0] && GetAsyncKeyState(0x74)) { key(Kb_Key_F5); continue; }
+			if (Kb_Key_F6[0] && GetAsyncKeyState(0x75)) { key(Kb_Key_F6); continue; }
+			if (Kb_Key_F7[0] && GetAsyncKeyState(0x76)) { key(Kb_Key_F7); continue; }
+			if (Kb_Key_F8[0] && GetAsyncKeyState(0x77)) { key(Kb_Key_F8); continue; }
+			if (Kb_Key_F9[0] && GetAsyncKeyState(0x78)) { key(Kb_Key_F9); continue; }
+			if (Kb_Key_F10[0] && GetAsyncKeyState(0x79)) { key(Kb_Key_F10); continue; }
+			if (Kb_Key_F11[0] && GetAsyncKeyState(0x7A)) { key(Kb_Key_F11); continue; }
+			if (Kb_Key_F12[0] && GetAsyncKeyState(0x7B)) { key(Kb_Key_F12); continue; }
 		}
 		if (!ignoreArrows) {
-			if (Kb_Key_Left[0] && GetAsyncKeyState(VK_LEFT)) { key(Kb_Key_Left, vdb); continue; }
-			if (Kb_Key_Up[0] && GetAsyncKeyState(VK_UP)) { key(Kb_Key_Up, vdb); continue; }
-			if (Kb_Key_Right[0] && GetAsyncKeyState(VK_RIGHT)) { key(Kb_Key_Right, vdb); continue; }
-			if (Kb_Key_Down[0] && GetAsyncKeyState(VK_DOWN)) { key(Kb_Key_Down, vdb); continue; }
+			if (Kb_Key_Left[0] && GetAsyncKeyState(VK_LEFT)) { key(Kb_Key_Left); continue; }
+			if (Kb_Key_Up[0] && GetAsyncKeyState(VK_UP)) { key(Kb_Key_Up); continue; }
+			if (Kb_Key_Right[0] && GetAsyncKeyState(VK_RIGHT)) { key(Kb_Key_Right); continue; }
+			if (Kb_Key_Down[0] && GetAsyncKeyState(VK_DOWN)) { key(Kb_Key_Down); continue; }
 		}
 		if (!ignoreOtherKeys) {
-			if (Kb_Key_Print_Screen[0] && GetAsyncKeyState(VK_SNAPSHOT)) { key(Kb_Key_Print_Screen, vdb); continue; }
-			if (Kb_Key_Space[0] && GetAsyncKeyState(VK_SPACE)) { key(Kb_Key_Space, vdb); continue; }
-			if (Kb_Key_Tab[0] && GetAsyncKeyState(VK_TAB)) { key(Kb_Key_Tab, vdb); continue; }
-			if (Kb_Key_Left_Shift[0] && GetAsyncKeyState(VK_LSHIFT)) { key(Kb_Key_Left_Shift, vdb); continue; }
-			if (Kb_Key_Right_Shift[0] && GetAsyncKeyState(VK_RSHIFT)) { key(Kb_Key_Right_Shift, vdb); continue; }
-			if (Kb_Key_Left_Ctrl[0] && GetAsyncKeyState(VK_LCONTROL)) { key(Kb_Key_Left_Ctrl, vdb); continue; }
-			if (Kb_Key_Right_Ctrl[0] && GetAsyncKeyState(VK_RCONTROL)) { key(Kb_Key_Right_Ctrl, vdb); continue; }
-			if (Kb_Key_Enter[0] && GetAsyncKeyState(VK_RETURN)) { key(Kb_Key_Enter, vdb); continue; }
-			if (Kb_Key_Caps[0] && GetAsyncKeyState(VK_CAPITAL)) { key(Kb_Key_Caps, vdb); continue; }
-			if (Kb_Key_Grave_Accent[0] && GetAsyncKeyState(VK_OEM_3)) { key(Kb_Key_Grave_Accent, vdb); continue; }
-			if (Kb_Key_Minus[0] && GetAsyncKeyState(VK_OEM_MINUS)) { key(Kb_Key_Minus, vdb); continue; }
-			if (Kb_Key_Equal[0] && GetAsyncKeyState(VK_OEM_PLUS)) { key(Kb_Key_Equal, vdb); continue; }
-			if (Kb_Key_Left_Bracket[0] && GetAsyncKeyState(VK_OEM_4)) { key(Kb_Key_Left_Bracket, vdb); continue; }
-			if (Kb_Key_Right_Bracket[0] && GetAsyncKeyState(VK_OEM_6)) { key(Kb_Key_Right_Bracket, vdb); continue; }
-			if (Kb_Key_Backslash[0] && GetAsyncKeyState(VK_OEM_5)) { key(Kb_Key_Backslash, vdb); continue; }
-			if (Kb_Key_Semicolon[0] && GetAsyncKeyState(VK_OEM_1)) { key(Kb_Key_Semicolon, vdb); continue; }
-			if (Kb_Key_Quote[0] && GetAsyncKeyState(VK_OEM_7)) { key(Kb_Key_Quote, vdb); continue; }
-			if (Kb_Key_Comma[0] && GetAsyncKeyState(VK_OEM_COMMA)) { key(Kb_Key_Comma, vdb); continue; }
-			if (Kb_Key_Period[0] && GetAsyncKeyState(VK_OEM_PERIOD)) { key(Kb_Key_Period, vdb); continue; }
-			if (Kb_Key_Forwardslash[0] && GetAsyncKeyState(VK_OEM_2)) { key(Kb_Key_Forwardslash, vdb); continue; }
-			if (Kb_Key_Menu[0] && GetAsyncKeyState(VK_APPS)) { key(Kb_Key_Menu, vdb); continue; }
-			if (Kb_Key_Insert[0] && GetAsyncKeyState(VK_INSERT)) { key(Kb_Key_Insert, vdb); continue; }
-			if (Kb_Key_Delete[0] && GetAsyncKeyState(VK_DELETE)) { key(Kb_Key_Delete, vdb); continue; }
-			if (Kb_Key_Home[0] && GetAsyncKeyState(VK_HOME)) { key(Kb_Key_Home, vdb); continue; }
-			if (Kb_Key_End[0] && GetAsyncKeyState(VK_END)) { key(Kb_Key_End, vdb); continue; }
-			if (Kb_Key_PgUp[0] && GetAsyncKeyState(VK_PRIOR)) { key(Kb_Key_PgUp, vdb); continue; }
-			if (Kb_Key_PgDn[0] && GetAsyncKeyState(VK_NEXT)) { key(Kb_Key_PgDn, vdb); continue; }
+			if (Kb_Key_Print_Screen[0] && GetAsyncKeyState(VK_SNAPSHOT)) { key(Kb_Key_Print_Screen); continue; }
+			if (Kb_Key_Space[0] && GetAsyncKeyState(VK_SPACE)) { key(Kb_Key_Space); continue; }
+			if (Kb_Key_Tab[0] && GetAsyncKeyState(VK_TAB)) { key(Kb_Key_Tab); continue; }
+			if (Kb_Key_Left_Shift[0] && GetAsyncKeyState(VK_LSHIFT)) { key(Kb_Key_Left_Shift); continue; }
+			if (Kb_Key_Right_Shift[0] && GetAsyncKeyState(VK_RSHIFT)) { key(Kb_Key_Right_Shift); continue; }
+			if (Kb_Key_Left_Ctrl[0] && GetAsyncKeyState(VK_LCONTROL)) { key(Kb_Key_Left_Ctrl); continue; }
+			if (Kb_Key_Right_Ctrl[0] && GetAsyncKeyState(VK_RCONTROL)) { key(Kb_Key_Right_Ctrl); continue; }
+			if (Kb_Key_Enter[0] && GetAsyncKeyState(VK_RETURN)) { key(Kb_Key_Enter); continue; }
+			if (Kb_Key_Caps[0] && GetAsyncKeyState(VK_CAPITAL)) { key(Kb_Key_Caps); continue; }
+			if (Kb_Key_Grave_Accent[0] && GetAsyncKeyState(VK_OEM_3)) { key(Kb_Key_Grave_Accent); continue; }
+			if (Kb_Key_Minus[0] && GetAsyncKeyState(VK_OEM_MINUS)) { key(Kb_Key_Minus); continue; }
+			if (Kb_Key_Equal[0] && GetAsyncKeyState(VK_OEM_PLUS)) { key(Kb_Key_Equal); continue; }
+			if (Kb_Key_Left_Bracket[0] && GetAsyncKeyState(VK_OEM_4)) { key(Kb_Key_Left_Bracket); continue; }
+			if (Kb_Key_Right_Bracket[0] && GetAsyncKeyState(VK_OEM_6)) { key(Kb_Key_Right_Bracket); continue; }
+			if (Kb_Key_Backslash[0] && GetAsyncKeyState(VK_OEM_5)) { key(Kb_Key_Backslash); continue; }
+			if (Kb_Key_Semicolon[0] && GetAsyncKeyState(VK_OEM_1)) { key(Kb_Key_Semicolon); continue; }
+			if (Kb_Key_Quote[0] && GetAsyncKeyState(VK_OEM_7)) { key(Kb_Key_Quote); continue; }
+			if (Kb_Key_Comma[0] && GetAsyncKeyState(VK_OEM_COMMA)) { key(Kb_Key_Comma); continue; }
+			if (Kb_Key_Period[0] && GetAsyncKeyState(VK_OEM_PERIOD)) { key(Kb_Key_Period); continue; }
+			if (Kb_Key_Forwardslash[0] && GetAsyncKeyState(VK_OEM_2)) { key(Kb_Key_Forwardslash); continue; }
+			if (Kb_Key_Menu[0] && GetAsyncKeyState(VK_APPS)) { key(Kb_Key_Menu); continue; }
+			if (Kb_Key_Insert[0] && GetAsyncKeyState(VK_INSERT)) { key(Kb_Key_Insert); continue; }
+			if (Kb_Key_Delete[0] && GetAsyncKeyState(VK_DELETE)) { key(Kb_Key_Delete); continue; }
+			if (Kb_Key_Home[0] && GetAsyncKeyState(VK_HOME)) { key(Kb_Key_Home); continue; }
+			if (Kb_Key_End[0] && GetAsyncKeyState(VK_END)) { key(Kb_Key_End); continue; }
+			if (Kb_Key_PgUp[0] && GetAsyncKeyState(VK_PRIOR)) { key(Kb_Key_PgUp); continue; }
+			if (Kb_Key_PgDn[0] && GetAsyncKeyState(VK_NEXT)) { key(Kb_Key_PgDn); continue; }
 		}
 		if (!ignoreNumPad) {
-			if (Kb_Key_Numpad_0[0] && GetAsyncKeyState(VK_NUMPAD0)) { key(Kb_Key_Numpad_0, vdb); continue; }
-			if (Kb_Key_Numpad_1[0] && GetAsyncKeyState(VK_NUMPAD1)) { key(Kb_Key_Numpad_1, vdb); continue; }
-			if (Kb_Key_Numpad_2[0] && GetAsyncKeyState(VK_NUMPAD2)) { key(Kb_Key_Numpad_2, vdb); continue; }
-			if (Kb_Key_Numpad_3[0] && GetAsyncKeyState(VK_NUMPAD3)) { key(Kb_Key_Numpad_3, vdb); continue; }
-			if (Kb_Key_Numpad_4[0] && GetAsyncKeyState(VK_NUMPAD4)) { key(Kb_Key_Numpad_4, vdb); continue; }
-			if (Kb_Key_Numpad_5[0] && GetAsyncKeyState(VK_NUMPAD5)) { key(Kb_Key_Numpad_5, vdb); continue; }
-			if (Kb_Key_Numpad_6[0] && GetAsyncKeyState(VK_NUMPAD6)) { key(Kb_Key_Numpad_6, vdb); continue; }
-			if (Kb_Key_Numpad_7[0] && GetAsyncKeyState(VK_NUMPAD7)) { key(Kb_Key_Numpad_7, vdb); continue; }
-			if (Kb_Key_Numpad_8[0] && GetAsyncKeyState(VK_NUMPAD8)) { key(Kb_Key_Numpad_8, vdb); continue; }
-			if (Kb_Key_Numpad_9[0] && GetAsyncKeyState(VK_NUMPAD9)) { key(Kb_Key_Numpad_9, vdb); continue; }
-			if (Kb_Key_Numlock[0] && GetAsyncKeyState(VK_NUMLOCK)) { key(Kb_Key_Numlock, vdb); continue; }
-			if (Kb_Key_Numpad_Divide[0] && GetAsyncKeyState(VK_DIVIDE)) { key(Kb_Key_Numpad_Divide, vdb); continue; }
-			if (Kb_Key_Numpad_Multiply[0] && GetAsyncKeyState(VK_MULTIPLY)) { key(Kb_Key_Numpad_Multiply, vdb); continue; }
-			if (Kb_Key_Numpad_Minus[0] && GetAsyncKeyState(VK_SUBTRACT)) { key(Kb_Key_Numpad_Minus, vdb); continue; }
-			if (Kb_Key_Numpad_Add[0] && GetAsyncKeyState(VK_ADD)) { key(Kb_Key_Numpad_Add, vdb); continue; }
-			if (Kb_Key_Numpad_Period[0] && GetAsyncKeyState(VK_DECIMAL)) { key(Kb_Key_Numpad_Period, vdb); continue; }
-			if (Kb_Key_Numpad_Enter[0] && GetAsyncKeyState(VK_RETURN)) { key(Kb_Key_Numpad_Enter, vdb); continue; }
+			if (Kb_Key_Numpad_0[0] && GetAsyncKeyState(VK_NUMPAD0)) { key(Kb_Key_Numpad_0); continue; }
+			if (Kb_Key_Numpad_1[0] && GetAsyncKeyState(VK_NUMPAD1)) { key(Kb_Key_Numpad_1); continue; }
+			if (Kb_Key_Numpad_2[0] && GetAsyncKeyState(VK_NUMPAD2)) { key(Kb_Key_Numpad_2); continue; }
+			if (Kb_Key_Numpad_3[0] && GetAsyncKeyState(VK_NUMPAD3)) { key(Kb_Key_Numpad_3); continue; }
+			if (Kb_Key_Numpad_4[0] && GetAsyncKeyState(VK_NUMPAD4)) { key(Kb_Key_Numpad_4); continue; }
+			if (Kb_Key_Numpad_5[0] && GetAsyncKeyState(VK_NUMPAD5)) { key(Kb_Key_Numpad_5); continue; }
+			if (Kb_Key_Numpad_6[0] && GetAsyncKeyState(VK_NUMPAD6)) { key(Kb_Key_Numpad_6); continue; }
+			if (Kb_Key_Numpad_7[0] && GetAsyncKeyState(VK_NUMPAD7)) { key(Kb_Key_Numpad_7); continue; }
+			if (Kb_Key_Numpad_8[0] && GetAsyncKeyState(VK_NUMPAD8)) { key(Kb_Key_Numpad_8); continue; }
+			if (Kb_Key_Numpad_9[0] && GetAsyncKeyState(VK_NUMPAD9)) { key(Kb_Key_Numpad_9); continue; }
+			if (Kb_Key_Numlock[0] && GetAsyncKeyState(VK_NUMLOCK)) { key(Kb_Key_Numlock); continue; }
+			if (Kb_Key_Numpad_Divide[0] && GetAsyncKeyState(VK_DIVIDE)) { key(Kb_Key_Numpad_Divide); continue; }
+			if (Kb_Key_Numpad_Multiply[0] && GetAsyncKeyState(VK_MULTIPLY)) { key(Kb_Key_Numpad_Multiply); continue; }
+			if (Kb_Key_Numpad_Minus[0] && GetAsyncKeyState(VK_SUBTRACT)) { key(Kb_Key_Numpad_Minus); continue; }
+			if (Kb_Key_Numpad_Add[0] && GetAsyncKeyState(VK_ADD)) { key(Kb_Key_Numpad_Add); continue; }
+			if (Kb_Key_Numpad_Period[0] && GetAsyncKeyState(VK_DECIMAL)) { key(Kb_Key_Numpad_Period); continue; }
+			if (Kb_Key_Numpad_Enter[0] && GetAsyncKeyState(VK_RETURN)) { key(Kb_Key_Numpad_Enter); continue; }
 		}
 		if (GetAsyncKeyState(VK_LMENU)) {
-			if (Kb_Key_Left_Alt[0]) key(Kb_Key_Left_Alt, vdb);
+			if (Kb_Key_Left_Alt[0]) key(Kb_Key_Left_Alt);
 			else {
 				while (GetAsyncKeyState(VK_LMENU) != 0)	sleep(frequency / 4);
 				clear_all_keys();
@@ -3390,7 +3420,7 @@ RgbScaleLayout			1.00
 			continue;
 		}
 		if (GetAsyncKeyState(VK_RMENU)) {
-			if (Kb_Key_Right_Alt[0]) key(Kb_Key_Right_Alt, vdb);
+			if (Kb_Key_Right_Alt[0]) key(Kb_Key_Right_Alt);
 			else {
 				while (GetAsyncKeyState(VK_RMENU) != 0)	sleep(frequency / 4);
 				clear_all_keys();
@@ -3405,15 +3435,15 @@ RgbScaleLayout			1.00
 #pragma endregion
 
 		if (mvdb) { //vdb size has changed. mvdb.
-			vdb = vstrand;
-		
-			if (mvdb == 1) {
-				strand = L"<anu>";
-				scan_db(vdb);
-				repeats = repeats[0] ? L"<anu:>" + repeats.substr(5) : L"";
-				strand.clear();
-			}
-			
+			vstrand.clear();
+			vstrand_out.clear();
+			make_vdb_table();
+
+			strand = L"<anu>";
+			scan_db();
+			repeats = repeats[0] ? L"<anu:>" + repeats.substr(5) : L"";
+			strand.clear();
+
 			mvdb = 0;
 		}
 
