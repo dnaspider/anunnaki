@@ -11,8 +11,6 @@ using namespace std;
 
 struct Strand
 {
-	//unsigned int line{};
-	//wstring out{};
 	wstring in{};
 	wstring g{};
 	bool ft{};
@@ -43,8 +41,7 @@ wstring qq = L"", qp = L"", qx = L"", qy = L"";
 wstring repeats = L"";
 wstring Loop_Insert_Text = L"";
 wstring out = L"", in = L"";
-wstring w_delimiter = L"\n"; //°";
-string delimiter = ""; //°";
+string delimiter = "\n"; //°";
 double RgbScaleLayout = 1.00; //100%
 double ic = 0; //<+> icp
 vector<Strand> vstrand{};
@@ -81,6 +78,7 @@ bool out_sleep = 1;
 bool stop = 0;
 bool utf_8 = 1, u8{};
 bool ccm = 0; //close_ctrl_mode toggle
+bool multi_line = 0; //<x > \n\n
 
 #pragma endregion
 
@@ -101,7 +99,7 @@ struct Multi_ {
 #pragma region protos
 static void showOutsMsg(wstring, wstring, wstring, bool),
 	run(wstring),
-	scan_db(bool),
+	scan_db(),
 	repeat(),
 	clear_all_keys()
 ;
@@ -132,55 +130,115 @@ static void make_vdb_table() {
 
 	if (!f) { showOutsMsg(L"", L"\\0C\\" + database + L"\\0C\\\\4 not found!\\7\\n", L"", 1); return; }
 
-	f.imbue(locale("en_us.utf8")); //extract
+	f.imbue(locale("en_us.utf8"));
 
 	wstring cell;
 	string cells;
 
-	//unsigned int line{};
-	if (vstrand.size() == 0) {  //blank for connect
-		vstrand.push_back({ L"", L"", 0 });
-		vstrand_out.push_back({ L"" });
-	}
+	c = 0; //multi_line
+	if (strand[0]) strand.clear();
+	
+	Strand s{};
+	Strand_out s_o{};
+	
+	s.in.clear(); s.g.clear(); s.ft = 0;
+	s_o.out.clear();
+
+	auto clears = [&s, &s_o]() {
+		s.in.clear(); s.g.clear(); s.ft = 0;
+		s_o.out.clear();
+		};
+
+	auto div = [&clears, &cell, &s, &s_o]() {
+		clears();
+		s.in = cell.substr(0, cell.find_first_of(L" -:>"));
+
+		if (!s.g[0]) {
+			s.g = cell.substr(s.in.length(), 1);
+			if (s.g[0] && s.g[0] != '>') s.g += cell[s.in.length() + 1] == '>' ? L">" : L"";
+		}
+
+		s_o.out = cell.substr(s.in.length() + s.g.length());
+		if (!s_o.out[0]) s.ft = 1;
+
+		if (s.in[0] == '<')
+			s.in += s.g;
+		};
+
+	auto rnt = [](wstring& x) {
+		x = regex_replace(x, wregex(L"\n"), L"");
+		x = regex_replace(x, wregex(L"\t"), L"");
+		};
+
+	auto sign = [&s_o, &rnt]() {
+		rnt(strand);
+		s_o.out = strand;
+		if (strand[0]) strand.clear();
+		};
 
 	while (getline(f, cells, delimiter[0])) {
 
+		clears();
+
 		cell = utf8_to_wstring(cells);
 
-		if (delimiter[0] != '\n')
-			if (delimiter[0] > 127)
-				cell.pop_back();
-
-		Strand s{};
-		Strand_out s_o{};
-
-		//s.line = line;
+		if (delimiter[0] != '\n' && cell[0] && delimiter.size() == 1) {
+			cell.pop_back();
+			rnt(cell);
+		}
 
 		if (cell[0]) {
+
 			if (cell.substr(0, 4) == L"<'''")
 				break;
 
-			s.in = cell.substr(0, cell.find_first_of(L" -:>"));
+			div();
+		
+			if (multi_line && s.g[0] == ' ' && cell[0] != ' ') {
+				if (s.g[0] == ' ') {
+					s.ft = 0;
+					strand += s_o.out;
+					while (1) {
+						//clears();
+						getline(f, cells, delimiter[0]);
+						cell = utf8_to_wstring(cells);
+						if (cell.substr(0, 4) == L"<'''") {
+							sign();
+							vstrand_out.push_back(s_o);
+							vstrand.push_back(s);
+							return;
+						}
+						if (cell == strand && !s_o.out[0] || strand[0] && strand == s_o.out) { sign(); break; }
+						if (!cell[0] || strand[0] && strand[strand.length() - 1] == ';') {
+							if (strand[0] && strand[strand.length() - 1] == ';')
+								strand.pop_back();
+							sign();
+							break;
+						}
+						else if (cell[0] != '\t' && cell[0] != '\n') {
+							sign();
+							vstrand_out.push_back(s_o);
+							vstrand.push_back(s);
 
-			if (!s.g[0]) {
-				s.g = cell.substr(s.in.length(), 1);
-				if (s.g[0] && s.g[0] != '>') s.g += cell[s.in.length() + 1] == '>' ? L">" : L"";
+							div();
+							break;
+						}
+						strand += cell;
+					}
+					
+				}
+				
 			}
 
-			s_o.out = cell.substr(s.in.length() + s.g.length());
-			if (!s_o.out[0]) s.ft = 1;
-
-			if (s.in[0] == '<')
-				s.in += s.g;
 		}
+
 
 		vstrand.push_back(s);
 		vstrand_out.push_back(s_o);
 
-		//++line;
-
 	}
 	f.close();
+	if (strand[0]) strand.clear();
 }
 
 static wstring getTime(wstring& w) {
@@ -258,7 +316,6 @@ static void kb(wchar_t b) { //out char
 static void showOutsMsg(wstring s, wstring w, wstring s1 = L"", bool make_color = 1) {
 	HANDLE hC = GetStdHandle(STD_OUTPUT_HANDLE);
 	size_t x = 0; bool t = 0;
-	if (delimiter[0] != '\n') { w = regex_replace(w, wregex(L"\n"), L""); w = regex_replace(w, wregex(L"\t"), L""); }
 	auto write = [&x, &t](wstring w) {
 		wcout << w;
 		++x; t = 1;
@@ -374,6 +431,9 @@ static void load_settings() {
 
 		auto er = [se, v]() { showOutsMsg(L"", L"\\4Error\\7 in \\0C\\" + settings + L"\\0C\\ \\4[" + se + L" " + v + L"]\\7\\n", L"", 1); ShowWindow(GetConsoleWindow(), SW_RESTORE); SetForegroundWindow(GetConsoleWindow()); };
 		switch (x) {
+		case 973://MultiLine:
+		{ if (v == L"0" || v == L"1") multi_line = stoi(v); else er(); } break;
+		case 865://PauseKey:
 		case 545://Debug:
 		{ if (v == L"0" || v == L"1" || v == L"2") debug = stoi(v); else er(); } break;
 		case 353://UTF8:
@@ -400,7 +460,6 @@ static void load_settings() {
 		{ if (check_if_num(v) > L"") RSHIFTCtrlKeyToggle = stoi(v); else er(); } break;
 		case 1273://ManualRepeat:
 		{ if (v == L"0" || v == L"1") ManualRepeat = stoi(v); else er(); } break;
-		case 865://PauseKey:
 		{ if (check_if_num(v) > L"") PauseKey = stoi(v); else er(); } break;
 		case 1708://Loop_Insert_Text:
 		{ if (!v[0]) { v[0] = '>'; } if (v[v.length() - 1] != '>') v += '>'; Loop_Insert_Text = v; } break;
@@ -602,8 +661,12 @@ static void load_settings() {
 			Kb_Key_Numpad_Enter = v; break;
 		case 2066://DbMultiLineDelimiter:
 			delimiter = wstring_to_utf8(v);
-			if (delimiter[0] != '\n')
+			
+			if (v[0] == '\\')
+				delimiter = '\n';
+			else
 				delimiter = delimiter.substr(1);
+
 			break;
 		case 1370://ClearInputKey:
 		{ if (check_if_num(v) > L"") clear_strand_key = stoi(v); else er(); } break;
@@ -675,6 +738,9 @@ static void load_settings() {
 		ignoreOtherKeys = 0;
 	else
 		ignoreOtherKeys = 1;
+
+	if (multi_line) delimiter = '\n';
+
 	f.close();
 	clear_all_keys();
 }
@@ -688,6 +754,7 @@ static void printSe() {
 		wcout << "Settings: " << settings << '\n';
 		wcout << "Database: " << database << '\n';
 		cout << "DbMultiLineDelimiter: "; if (delimiter[0] == '\n') cout << "\\n\n"; else cout << delimiter.substr(1) << '\n';
+		cout << "MultiLine: " << multi_line << '\n';
 		wcout << "ReplacerDb: " << replacerDb << '\n';
 		cout << "UTF8: " << utf_8 << '\n';
 		cout << "ShowInput: " << show_strand << '\n';
@@ -965,7 +1032,7 @@ static void setQxQy(wstring x, size_t z = 0) {
 	//wcout << "x: " << x  << "\nqx: " << qx << "\nqy: " << qy << endl;
 }
 
-static wstring loadVar(wstring q = L"") {
+static wstring get_out(wstring q = L"") {
 	if (q[0] != '<') {
 		if (q[q.length() - 1] == '>')
 			q.pop_back();
@@ -980,7 +1047,7 @@ static wstring loadVar(wstring q = L"") {
 	return L"";
 }
 
-static wstring isVar(wstring& q) { // Replacer | {var} {var:} {var-} {var>} | <r:>
+static wstring is_replacer(wstring& q) { // Replacer | {var} {var:} {var-} {var>} | <r:>
 	if (!replacerDb[0]) return q;
 	if (q.find('{') != string::npos && q.find('}') != string::npos) {
 		wstring tqg = q, tq{};
@@ -992,7 +1059,7 @@ static wstring isVar(wstring& q) { // Replacer | {var} {var:} {var-} {var>} | <r
 			tq = q;
 			if (q[0]) {
 				if (q[0] == '\'' && q != L"'") { tqg.replace(tqg.find('{'), 2 + q.length(), L""); q = tqg; continue; } //{'ignore}
-				q = loadVar(q);
+				q = get_out(q);
 			}
 			if (!q[0]) {
 				tqg.replace(tqg.find('{'), 1, L"::_::"); q = tqg;
@@ -1035,17 +1102,14 @@ static wstring connect(wstring& w, bool bg = 0) {
 	}
 
 	if (con) {
-		vstrand_out.at(0).out.clear();
-		strand = qqs;
-		scan_db(1);
-		strand.clear();
-		if (vstrand_out.at(0).out[0]) {
-			if (delimiter[0] != '\n') { vstrand_out.at(0).out = regex_replace(vstrand_out.at(0).out, wregex(L"\n"), L""); vstrand_out.at(0).out = regex_replace(vstrand_out.at(0).out, wregex(L"\t"), L""); }
-			wstring x = vstrand_out.at(0).out,
-				xx = qq.substr(qqs.length() - bg);
-			if (bg)	return x;
-			w = x + xx;
-			w = isVar(w);
+		wstring o = get_out(qqs);
+		
+		if (o[0]) {
+			if (bg)
+				return is_replacer(o);
+
+			w = o + qq.substr(qqs.length());
+			w = is_replacer(w);
 			c = -1;
 			if (out_speed > 0) out_sleep = 0;
 			return L"";
@@ -1419,7 +1483,7 @@ static void if_esc_pause(Multi_ multi_) {
 		multi_.out_ = out;
 		multi_.qq_ = qq;
 		multi_.qp_ = qp;
-		multi_.strand_ = strand;
+		//multi_.strand_ = strand;
 		multi_.c_ = c;
 
 		while (GetAsyncKeyState(PauseKey) != 0)
@@ -1449,7 +1513,7 @@ static void if_esc_pause(Multi_ multi_) {
 			out = multi_.out_;
 			qq = multi_.qq_;
 			qp = multi_.qp_;
-			strand = multi_.strand_;
+			//strand = multi_.strand_;
 			c = multi_.c_;
 		}
 	}
@@ -1535,30 +1599,21 @@ static inline void clear_key(wchar_t key) {
 	}
 }
 
-static void scan_db(bool ret = 0) {
+static void scan_db() {
 
 	bool fallthrough_ = 0, found_io = 0;
 
 	for (size_t i = 0; i < vstrand.size(); ++i)
 	{
-		//return_connect
-		if (ret && vstrand.at(i).in[0] != '<')
-			continue;
-
 		if (repeats[0] == '>'
 			|| fallthrough_
-			|| close_ctrl_mode && vstrand.at(i).in == strand.substr(0, strand.length() - 1 + ret)
+			|| close_ctrl_mode && vstrand.at(i).in == strand.substr(0, strand.length() - 1)
 			|| vstrand.at(i).in[0] == '<' &&
 				vstrand.at(i).in.substr(0, vstrand.at(i).in.length() - vstrand.at(i).g.length())
-				== strand.substr(0, strand.length() - 1 + ret)
+				== strand.substr(0, strand.length() - 1)
 			|| !close_ctrl_mode && vstrand.at(i).in == strand
 			|| !close_ctrl_mode && vstrand.at(i).in == strand + vstrand.at(i).g
 			) {
-
-			if (ret) {
-				vstrand_out.at(0).out = vstrand_out.at(i).out;
-				return;
-			}
 
 			if (out[0]) out.clear();
 
@@ -1598,12 +1653,7 @@ static void scan_db(bool ret = 0) {
 
 			//run output
 
-			if (replacerDb[0]) out = isVar(out); //<r:>
-
-			if (delimiter[0] != '\n') {
-				out = regex_replace(out, wregex(L"\n"), L"");
-				out = regex_replace(out, wregex(L"\t"), L"");
-			}
+			if (replacerDb[0]) out = is_replacer(out); //<r:>
 
 			Multi_ multi_;
 
@@ -1633,7 +1683,6 @@ static void scan_db(bool ret = 0) {
 							if (qp[0] == ' ') qp = qp.substr(1);
 							setQxQy(qp);
 						}
-						if (delimiter[0] != '\n') { qp = regex_replace(qp, wregex(L"\n"), L""); qp = regex_replace(qp, wregex(L"\t"), L""); }
 					}
 					switch (qq[1]) {
 					case '<':
@@ -2276,24 +2325,24 @@ static void scan_db(bool ret = 0) {
 													case ':': //== <ifxy:> <ifxy=:> <ifxye:>
 													case '=':
 													case 'e': {
-														if (pt.x == tx && pt.y == ty) ++count = 1;
+														if (pt.x == tx && pt.y == ty) ++count;
 														break;
 													}
 													case 'n': //!= <ifxyn:> <ifxy!:>
 													case '!': {
-														if (pt.x != tx && pt.y != ty) ++count = 1;
+														if (pt.x != tx && pt.y != ty) ++count;
 														break;
 													}
 													case 'l'://<= <ifxyl:> <ifxyle:> <ifxy<:> <ifxy<=:>
 													case 'L':
 													case '<': {
-														if (qq[6] == 'e' || qq[6] == '=') { if (pt.x <= tx && pt.y <= ty) { ++count = 1; break; } } //ifxyle <=
-														if (pt.x < tx && pt.y < ty) ++count = 1;
+														if (qq[6] == 'e' || qq[6] == '=') { if (pt.x <= tx && pt.y <= ty) { ++count; break; } } //ifxyle <=
+														if (pt.x < tx && pt.y < ty) ++count;
 														break;
 													}
 													case 'g': { //>= <ifxyg:> <ifxyge:> <ifxyg=:>
-														if (qq[6] == 'e' || qq[6] == '=') { if (pt.x >= tx && pt.y >= ty) { ++count = 1; break; } } //ifxyge >=/g=
-														if (pt.x > tx && pt.y > ty) ++count = 1;
+														if (qq[6] == 'e' || qq[6] == '=') { if (pt.x >= tx && pt.y >= ty) { ++count; break; } } //ifxyge >=/g=
+														if (pt.x > tx && pt.y > ty) ++count;
 														break;
 													}
 												}
@@ -2427,6 +2476,9 @@ static void scan_db(bool ret = 0) {
 									qq = tf_T;
 									connect(tf_T);
 									out = tf_T_link_plus_connect && multi_.br_ || tf_F_link_plus_connect && !multi_.br_ || !tf_F[0] && tf_F_link_plus_connect ? tf_T + l : tf_T;
+									
+									multi_.br_ = 0;
+
 									break;
 								}
 
@@ -3047,15 +3099,10 @@ RgbScaleLayout			1.00
 	if (utf_8)
 		call_utf8();
 
-	delimiter = wstring_to_utf8(w_delimiter);
-
-	if (delimiter[0] != '\n' && delimiter[0] > 127)
-		delimiter = delimiter.substr(1);
-
-	strand = L"<anu>";
-
 	make_vdb_table();
 	
+	strand = L"<anu>";
+
 	{
 	bool b = show_strand;
 	show_strand = 0;
