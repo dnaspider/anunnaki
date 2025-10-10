@@ -60,7 +60,8 @@ unsigned short RSHIFTCtrlKeyToggle = 9;
 unsigned short LSHIFTCtrlKey = 9;
 unsigned short repeat_switch = 0;
 unsigned short debug = 0;
-unsigned short mvdb = 0; //make vstrand to vdb
+unsigned short mvdb = 0; //make vstrand to 
+bool multi_line = 0; //<x > \n\n
 bool start_hidden = 0;
 bool show_strand = 1;
 bool ignoreAZ = 0;
@@ -78,7 +79,6 @@ bool out_sleep = 1;
 bool stop = 0;
 bool utf_8 = 1, u8{};
 bool ccm = 0; //close_ctrl_mode toggle
-bool multi_line = 0; //<x > \n\n
 
 #pragma endregion
 
@@ -140,51 +140,26 @@ static void make_vdb_table() {
 	
 	Strand s{};
 	Strand_out s_o{};
-	
-	s.in.clear(); s.g.clear(); s.ft = 0;
-	s_o.out.clear();
 
-	auto clears = [&s, &s_o]() {
-		s.in.clear(); s.g.clear(); s.ft = 0;
-		s_o.out.clear();
-		};
-
-	auto div = [&clears, &cell, &s, &s_o]() {
-		clears();
-		s.in = cell.substr(0, cell.find_first_of(L" -:>"));
-
-		if (!s.g[0]) {
-			s.g = cell.substr(s.in.length(), 1);
-			if (s.g[0] && s.g[0] != '>') s.g += cell[s.in.length() + 1] == '>' ? L">" : L"";
-		}
-
-		s_o.out = cell.substr(s.in.length() + s.g.length());
-		if (!s_o.out[0]) s.ft = 1;
-
-		if (s.in[0] == '<')
-			s.in += s.g;
-		};
-
-	auto rnt = [](wstring& x) {
+	bool b = 0;
+	auto nt = [&b](wstring& x) {
+		b = 0;
+		size_t y = x.length();
 		x = regex_replace(x, wregex(L"\n"), L"");
 		x = regex_replace(x, wregex(L"\t"), L"");
-		};
-
-	auto sign = [&s_o, &rnt]() {
-		rnt(strand);
-		s_o.out = strand;
-		if (strand[0]) strand.clear();
+		return b = x.length() != y;
 		};
 
 	while (getline(f, cells, delimiter[0])) {
 
-		clears();
+		s.in.clear(); s.g.clear(); s.ft = 0;
+		s_o.out.clear();
 
 		cell = utf8_to_wstring(cells);
 
 		if (delimiter[0] != '\n' && cell[0] && delimiter.size() == 1) {
 			cell.pop_back();
-			rnt(cell);
+			nt(cell);
 		}
 
 		if (cell[0]) {
@@ -192,46 +167,52 @@ static void make_vdb_table() {
 			if (cell.substr(0, 4) == L"<'''")
 				break;
 
-			div();
+			if (multi_line)
+				if (cell[0]) nt(cell);
+
+			
+			s.in = cell.substr(0, cell.find_first_of(L" -:>"));
+
+			if (!s.g[0]) {
+				s.g = cell.substr(s.in.length(), 1);
+				if (s.g[0] && s.g[0] != '>') s.g += cell[s.in.length() + 1] == '>' ? L">" : L"";
+			}
+
+			s_o.out = cell.substr(s.in.length() + s.g.length());
+			if (!s_o.out[0]) s.ft = 1;
+
+			if (s.in[0] == '<')
+				s.in += s.g;
+
 		
-			if (multi_line && s.g[0] == ' ' && cell[0] != ' ') {
-				if (s.g[0] == ' ') {
-					s.ft = 0;
-					strand += s_o.out;
+			if (multi_line && s.g[0] && cell[0] != ' ') {
+				s.ft = 0;
+
+				if (!s_o.out[0] || b) {
+
 					while (1) {
-						//clears();
 						getline(f, cells, delimiter[0]);
 						cell = utf8_to_wstring(cells);
-						if (cell.substr(0, 4) == L"<'''") {
-							sign();
-							vstrand_out.push_back(s_o);
-							vstrand.push_back(s);
-							return;
-						}
-						if (cell == strand && !s_o.out[0] || strand[0] && strand == s_o.out) { sign(); break; }
-						if (!cell[0] || strand[0] && strand[strand.length() - 1] == ';') {
-							if (strand[0] && strand[strand.length() - 1] == ';')
-								strand.pop_back();
-							sign();
-							break;
-						}
-						else if (cell[0] != '\t' && cell[0] != '\n') {
-							sign();
-							vstrand_out.push_back(s_o);
-							vstrand.push_back(s);
 
-							div();
-							break;
-						}
+						if (cell[0]) nt(cell);
+
 						strand += cell;
+
+						if (!cell[0] || cell[cell.length() - 1] == ';')
+							break;
 					}
-					
+
+					s_o.out = strand;
 				}
+
+				if (s_o.out[s_o.out.length() - 1] == ';')
+					s_o.out.pop_back();
 				
+				if (strand[0]) strand.clear();
+
 			}
 
 		}
-
 
 		vstrand.push_back(s);
 		vstrand_out.push_back(s_o);
@@ -433,7 +414,6 @@ static void load_settings() {
 		switch (x) {
 		case 973://MultiLine:
 		{ if (v == L"0" || v == L"1") multi_line = stoi(v); else er(); } break;
-		case 865://PauseKey:
 		case 545://Debug:
 		{ if (v == L"0" || v == L"1" || v == L"2") debug = stoi(v); else er(); } break;
 		case 353://UTF8:
@@ -447,6 +427,7 @@ static void load_settings() {
 						num_error(L"Reload program for", L"1", L"UTF_8:");
 					else
 						call_utf8();
+					wcout.flush().clear();
 				}
 				else er();
 			}
@@ -460,6 +441,7 @@ static void load_settings() {
 		{ if (check_if_num(v) > L"") RSHIFTCtrlKeyToggle = stoi(v); else er(); } break;
 		case 1273://ManualRepeat:
 		{ if (v == L"0" || v == L"1") ManualRepeat = stoi(v); else er(); } break;
+		case 865://PauseKey:
 		{ if (check_if_num(v) > L"") PauseKey = stoi(v); else er(); } break;
 		case 1708://Loop_Insert_Text:
 		{ if (!v[0]) { v[0] = '>'; } if (v[v.length() - 1] != '>') v += '>'; Loop_Insert_Text = v; } break;
@@ -664,7 +646,7 @@ static void load_settings() {
 			
 			if (v[0] == '\\')
 				delimiter = '\n';
-			else
+			else if (delimiter[0] < 0)
 				delimiter = delimiter.substr(1);
 
 			break;
@@ -1378,6 +1360,9 @@ misc.
 Use legacy terminal: Terminal settings > Terminal > Windows Console Host
 Use \\\\g for > in <ifapp:>
 Other: \, \| \&
+
+Use blank line or ; for se.txt [MultiLine: 1]
+Enable in VS Code: "[plaintext]": { "editor.insertSpaces": false,
 )";
 
 }
@@ -3351,7 +3336,7 @@ RgbScaleLayout			1.00
 
 #pragma region input_strand
 		if (!ignoreAZ) {
-			if (Kb_Key_A[0] && GetAsyncKeyState(0x41)/* & 0x8000*/) { key(Kb_Key_A); continue; }
+			if (Kb_Key_A[0] && GetAsyncKeyState(0x41)) { key(Kb_Key_A); continue; }
 			if (Kb_Key_B[0] && GetAsyncKeyState(0x42)) { key(Kb_Key_B); continue; }
 			if (Kb_Key_C[0] && GetAsyncKeyState(0x43)) { key(Kb_Key_C); continue; }
 			if (Kb_Key_D[0] && GetAsyncKeyState(0x44)) { key(Kb_Key_D); continue; }
