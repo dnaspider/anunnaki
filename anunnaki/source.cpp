@@ -152,74 +152,76 @@ static void make_vdb_table() {
 
 	while (getline(f, cells, delimiter[0])) {
 
+		if (!cells[0] || cells[0] == ' ') continue;
+
+		if (cells.substr(0, 4) == "<'''")
+			break;
+
 		s.in.clear(); s.g.clear(); s.ft = 0;
 		s_o.out.clear();
 
 		cell = utf8_to_wstring(cells);
 
-		if (delimiter[0] != '\n' && cell[0] && delimiter.size() == 1) {
-			cell.pop_back();
-			nt(cell);
+		if (multi_line || delimiter[0] != '\n') nt(cell);
+
+
+		//io
+		s.in = cell.substr(0, cell.find_first_of(L" -:>"));
+
+		if (!s.g[0]) {
+			s.g = cell.substr(s.in.length(), 1);
+			if (s.g[0] && s.g[0] != '>') s.g += cell[s.in.length() + 1] == '>' ? L">" : L"";
 		}
 
-		if (cell[0]) {
+		s_o.out = cell.substr(s.in.length() + s.g.length());
 
-			if (cell.substr(0, 4) == L"<'''")
-				break;
+		if (s.in[0] == '<')
+			s.in += s.g;
 
-			if (multi_line)
-				if (cell[0]) nt(cell);
 
-			
-			s.in = cell.substr(0, cell.find_first_of(L" -:>"));
-
-			if (!s.g[0]) {
-				s.g = cell.substr(s.in.length(), 1);
-				if (s.g[0] && s.g[0] != '>') s.g += cell[s.in.length() + 1] == '>' ? L">" : L"";
+		//multi_line
+		if (multi_line && s.g[0] && cell[0] != ' ') {
+			if (s_o.out[0] && s_o.out[s_o.out.length() - 1] == ';') {
+				s_o.out.pop_back();
+				strand = s_o.out;
 			}
-
-			s_o.out = cell.substr(s.in.length() + s.g.length());
-			if (!s_o.out[0]) s.ft = 1;
-
-			if (s.in[0] == '<')
-				s.in += s.g;
-
-		
-			if (multi_line && s.g[0] && cell[0] != ' ') {
-				s.ft = 0;
-
-				if (!s_o.out[0] || b) {
-
-					while (1) {
-						getline(f, cells, delimiter[0]);
-						cell = utf8_to_wstring(cells);
-
-						if (cell[0]) nt(cell);
-
-						strand += cell;
-
-						if (!cell[0] || cell[cell.length() - 1] == ';')
-							break;
+			else if (b) {
+				while (1) {
+					getline(f, cells, delimiter[0]);
+					if (s_o.out[0] && !cells[0] || cells.substr(0, 4) == "<'''") {
+						strand += s_o.out; break;
 					}
+					cell = utf8_to_wstring(cells);
 
-					s_o.out = strand;
+
+					if (cell[0]) nt(cell); else b = 0;
+
+					if (s_o.out[0]) { strand = s_o.out; s_o.out.clear(); }
+					strand += cell;
+
+
+					if (!cell[0] && !b || cell[0] && cell[cell.length() - 1] == ';') {
+						if (cell[0]) strand.pop_back();
+						break;
+					}
 				}
 
-				if (s_o.out[s_o.out.length() - 1] == ';')
-					s_o.out.pop_back();
-				
-				if (strand[0]) strand.clear();
-
+				s_o.out = strand;
 			}
+			if (strand[0]) strand.clear();
 
 		}
 
+
+		if (!s_o.out[0]) s.ft = 1;
 		vstrand.push_back(s);
 		vstrand_out.push_back(s_o);
 
+		if (multi_line && cells.substr(0, 4) == "<'''")
+			break;
+
 	}
 	f.close();
-	if (strand[0]) strand.clear();
 }
 
 static wstring getTime(wstring& w) {
@@ -401,8 +403,8 @@ static void load_settings() {
 	}
 
 	wstring cell; string cells; while (getline(f, cells)) {
+		if (!cells[0] || cells[0] == ' ') continue;
 		cell = utf8_to_wstring(cells);
-		if (!cell[0] || cell[0] == ' ') continue;
 		wstring se = cell.substr(0, cell.find_first_of(L":\t ")); se += ':';
 		wstring v = (cell.substr(cell.find_first_of(L":\t ") + 1)); if (v.find_first_not_of(L"\t ") == string::npos) {//""
 			if (v != L" ") v.clear();
@@ -421,12 +423,8 @@ static void load_settings() {
 			if (se == L"UTF8:") {
 				if (v == L"0" || v == L"1") {
 					utf_8 = stoi(v);
-					if (v == L"0") continue;
-					
-					if (u8)
-						num_error(L"Reload program for", L"1", L"UTF_8:");
-					else
-						call_utf8();
+					if (utf_8 && !u8) call_utf8();
+					//num_error(L"Reload program for", L"1", L"UTF_8:");
 					wcout.flush().clear();
 				}
 				else er();
@@ -721,6 +719,7 @@ static void load_settings() {
 	else
 		ignoreOtherKeys = 1;
 
+	if (delimiter[0] != '\n') multi_line = 0;
 	if (multi_line) delimiter = '\n';
 
 	f.close();
@@ -729,141 +728,138 @@ static void load_settings() {
 
 static void printSe() {
 	if (qq[1] == 's') load_settings();
-	if (qq[1] == 's' || qq[1] == 'S') {
-		if (qq[1] == 'S') return;
-		wcout << settings << '\n'; ifstream f(settings); if (f.fail()) { showOutsMsg(L"Copy to ", settings, L"\n", 0); }
-		cout << "StartHidden: " << start_hidden << '\n';
-		wcout << "Settings: " << settings << '\n';
-		wcout << "Database: " << database << '\n';
-		cout << "DbMultiLineDelimiter: "; if (delimiter[0] == '\n') cout << "\\n\n"; else cout << delimiter.substr(1) << '\n';
-		cout << "MultiLine: " << multi_line << '\n';
-		wcout << "ReplacerDb: " << replacerDb << '\n';
-		cout << "UTF8: " << utf_8 << '\n';
-		cout << "ShowInput: " << show_strand << '\n';
-		cout << "InputLength: " << strand_length << '\n';
-		cout << "ClearInputKey: " << clear_strand_key << '\n';
-		cout << "CtrlKey: " << cKey << ' ' << cKeyMax << '\n';
-		cout << "CloseCtrlMode: " << close_ctrl_mode << '\n';
-		cout << "LSHIFT+CtrlKey: " << LSHIFTCtrlKey << '\n';
-		cout << "RSHIFT+CtrlKey_Toggle: " << RSHIFTCtrlKeyToggle << '\n';
-		cout << "CtrlScanOnlyMode: " << ctrl_scan_only_mode << '\n';
-		cout << "RSHIFT+LSHIFT_Only: " << RSHIFTLSHIFT_Only << '\n';
-		cout << "RepeatKey: " << repeat_key << '\n';
-		cout << "PauseKey: " << PauseKey << '\n';
-		cout << "RgbScaleLayout: " << RgbScaleLayout << '\n';
-		cout << "Frequency: " << frequency << '\n';
-		cout << "Ignore_0-9: " << ignore09 << '\n';
-		wcout << "Kb_Key_0: " << Kb_Key_0 << '\n';
-		wcout << "Kb_Key_1: " << Kb_Key_1 << '\n';
-		wcout << "Kb_Key_2: " << Kb_Key_2 << '\n';
-		wcout << "Kb_Key_3: " << Kb_Key_3 << '\n';
-		wcout << "Kb_Key_4: " << Kb_Key_4 << '\n';
-		wcout << "Kb_Key_5: " << Kb_Key_5 << '\n';
-		wcout << "Kb_Key_6: " << Kb_Key_6 << '\n';
-		wcout << "Kb_Key_7: " << Kb_Key_7 << '\n';
-		wcout << "Kb_Key_8: " << Kb_Key_8 << '\n';
-		wcout << "Kb_Key_9: " << Kb_Key_9 << '\n';
-		cout << "Ignore_A-Z: " << ignoreAZ << '\n';
-		wcout << "Kb_Key_A: " << Kb_Key_A << '\n';
-		wcout << "Kb_Key_B: " << Kb_Key_B << '\n';
-		wcout << "Kb_Key_C: " << Kb_Key_C << '\n';
-		wcout << "Kb_Key_D: " << Kb_Key_D << '\n';
-		wcout << "Kb_Key_E: " << Kb_Key_E << '\n';
-		wcout << "Kb_Key_F: " << Kb_Key_F << '\n';
-		wcout << "Kb_Key_G: " << Kb_Key_G << '\n';
-		wcout << "Kb_Key_H: " << Kb_Key_H << '\n';
-		wcout << "Kb_Key_I: " << Kb_Key_I << '\n';
-		wcout << "Kb_Key_J: " << Kb_Key_J << '\n';
-		wcout << "Kb_Key_K: " << Kb_Key_K << '\n';
-		wcout << "Kb_Key_L: " << Kb_Key_L << '\n';
-		wcout << "Kb_Key_M: " << Kb_Key_M << '\n';
-		wcout << "Kb_Key_N: " << Kb_Key_N << '\n';
-		wcout << "Kb_Key_O: " << Kb_Key_O << '\n';
-		wcout << "Kb_Key_P: " << Kb_Key_P << '\n';
-		wcout << "Kb_Key_Q: " << Kb_Key_Q << '\n';
-		wcout << "Kb_Key_R: " << Kb_Key_R << '\n';
-		wcout << "Kb_Key_S: " << Kb_Key_S << '\n';
-		wcout << "Kb_Key_T: " << Kb_Key_T << '\n';
-		wcout << "Kb_Key_U: " << Kb_Key_U << '\n';
-		wcout << "Kb_Key_V: " << Kb_Key_V << '\n';
-		wcout << "Kb_Key_W: " << Kb_Key_W << '\n';
-		wcout << "Kb_Key_X: " << Kb_Key_X << '\n';
-		wcout << "Kb_Key_Y: " << Kb_Key_Y << '\n';
-		wcout << "Kb_Key_Z: " << Kb_Key_Z << '\n';
-		cout << "Ignore_Arrows: " << ignoreArrows << '\n';
-		wcout << "Kb_Key_Left: " << Kb_Key_Left << '\n';
-		wcout << "Kb_Key_Up: " << Kb_Key_Up << '\n';
-		wcout << "Kb_Key_Right: " << Kb_Key_Right << '\n';
-		wcout << "Kb_Key_Down: " << Kb_Key_Down << '\n';
-		wcout << "Kb_Key_Backslash: " << Kb_Key_Backslash << '\n';
-		wcout << "Kb_Key_Caps: " << Kb_Key_Caps << '\n';
-		wcout << "Kb_Key_Comma: " << Kb_Key_Comma << '\n';
-		wcout << "Kb_Key_Delete: " << Kb_Key_Delete << '\n';
-		wcout << "Kb_Key_End: " << Kb_Key_End << '\n';
-		wcout << "Kb_Key_Enter: " << Kb_Key_Enter << '\n';
-		wcout << "Kb_Key_Equal: " << Kb_Key_Equal << '\n';
-		wcout << "Kb_Key_Esc: " << Kb_Key_Esc << '\n';
-		cout << "Ignore_F1-F12: " << ignoreF1s << '\n';
-		wcout << "Kb_Key_F1: " << Kb_Key_F1 << '\n';
-		wcout << "Kb_Key_F2: " << Kb_Key_F2 << '\n';
-		wcout << "Kb_Key_F3: " << Kb_Key_F3 << '\n';
-		wcout << "Kb_Key_F4: " << Kb_Key_F4 << '\n';
-		wcout << "Kb_Key_F5: " << Kb_Key_F5 << '\n';
-		wcout << "Kb_Key_F6: " << Kb_Key_F6 << '\n';
-		wcout << "Kb_Key_F7: " << Kb_Key_F7 << '\n';
-		wcout << "Kb_Key_F8: " << Kb_Key_F8 << '\n';
-		wcout << "Kb_Key_F9: " << Kb_Key_F9 << '\n';
-		wcout << "Kb_Key_F10: " << Kb_Key_F10 << '\n';
-		wcout << "Kb_Key_F11: " << Kb_Key_F11 << '\n';
-		wcout << "Kb_Key_F12: " << Kb_Key_F12 << '\n';
-		wcout << "Kb_Key_Print_Screen: " << Kb_Key_Print_Screen << '\n';
-		wcout << "Kb_Key_Forwardslash: " << Kb_Key_Forwardslash << '\n';
-		wcout << "Kb_Key_Grave_Accent: " << Kb_Key_Grave_Accent << '\n';
-		wcout << "Kb_Key_Home: " << Kb_Key_Home << '\n';
-		wcout << "Kb_Key_Insert: " << Kb_Key_Insert << '\n';
-		wcout << "Kb_Key_Left_Alt: " << Kb_Key_Left_Alt << '\n';
-		wcout << "Kb_Key_Left_Bracket: " << Kb_Key_Left_Bracket << '\n';
-		wcout << "Kb_Key_Left_Ctrl: " << Kb_Key_Left_Ctrl << '\n';
-		wcout << "Kb_Key_Left_Shift: " << Kb_Key_Left_Shift << '\n';
-		wcout << "Kb_Key_Menu: " << Kb_Key_Menu << '\n';
-		wcout << "Kb_Key_Minus: " << Kb_Key_Minus << '\n';
-		cout << "Ignore_NumPad: " << ignoreNumPad << '\n';
-		wcout << "Kb_Key_Numpad_0: " << Kb_Key_Numpad_0 << '\n';
-		wcout << "Kb_Key_Numpad_1: " << Kb_Key_Numpad_1 << '\n';
-		wcout << "Kb_Key_Numpad_2: " << Kb_Key_Numpad_2 << '\n';
-		wcout << "Kb_Key_Numpad_3: " << Kb_Key_Numpad_3 << '\n';
-		wcout << "Kb_Key_Numpad_4: " << Kb_Key_Numpad_4 << '\n';
-		wcout << "Kb_Key_Numpad_5: " << Kb_Key_Numpad_5 << '\n';
-		wcout << "Kb_Key_Numpad_6: " << Kb_Key_Numpad_6 << '\n';
-		wcout << "Kb_Key_Numpad_7: " << Kb_Key_Numpad_7 << '\n';
-		wcout << "Kb_Key_Numpad_8: " << Kb_Key_Numpad_8 << '\n';
-		wcout << "Kb_Key_Numpad_9: " << Kb_Key_Numpad_9 << '\n';
-		wcout << "Kb_Key_Numlock: " << Kb_Key_Numlock << '\n';
-		wcout << "Kb_Key_Numpad_Divide: " << Kb_Key_Numpad_Divide << '\n';
-		wcout << "Kb_Key_Numpad_Multiply: " << Kb_Key_Numpad_Multiply << '\n';
-		wcout << "Kb_Key_Numpad_Minus: " << Kb_Key_Numpad_Minus << '\n';
-		wcout << "Kb_Key_Numpad_Add: " << Kb_Key_Numpad_Add << '\n';
-		wcout << "Kb_Key_Numpad_Period: " << Kb_Key_Numpad_Period << '\n';
-		wcout << "Kb_Key_Numpad_Enter: " << Kb_Key_Numpad_Enter << '\n';
-		wcout << "Kb_Key_Period: " << Kb_Key_Period << '\n';
-		wcout << "Kb_Key_PgDn: " << Kb_Key_PgDn << '\n';
-		wcout << "Kb_Key_PgUp: " << Kb_Key_PgUp << '\n';
-		wcout << "Kb_Key_Quote: " << Kb_Key_Quote << '\n';
-		wcout << "Kb_Key_Right_Alt: " << Kb_Key_Right_Alt << '\n';
-		wcout << "Kb_Key_Right_Bracket: " << Kb_Key_Right_Bracket << '\n';
-		wcout << "Kb_Key_Right_Ctrl: " << Kb_Key_Right_Ctrl << '\n';
-		wcout << "Kb_Key_Right_Shift: " << Kb_Key_Right_Shift << '\n';
-		wcout << "Kb_Key_Semicolon: " << Kb_Key_Semicolon << '\n';
-		wcout << "Kb_Key_Space: " << Kb_Key_Space << '\n';
-		wcout << "Kb_Key_Tab: " << Kb_Key_Tab << '\n';
-		cout << "AutoBs_RepeatKey: " << auto_bs_repeat_key << '\n';
-		wcout << "Editor: " << editor << '\n';
-		wcout << "EditorDb: "; wcout << editorDb << '\n';
-		wcout << "EditorSe: "; wcout << editorSe << '\n';
-		wcout << "Loop_Insert_Text: " << Loop_Insert_Text << '\n';
-		wcout << "ManualRepeat: " << ManualRepeat << '\n';
-		cout << endl;
-	}
+	wcout << settings << '\n'; ifstream f(settings); if (f.fail()) { showOutsMsg(L"Copy to ", settings, L"\n", 0); }
+	cout << "StartHidden: " << start_hidden << '\n';
+	wcout << "Settings: " << settings << '\n';
+	wcout << "Database: " << database << '\n';
+	cout << "DbMultiLineDelimiter: "; if (delimiter[0] == '\n') cout << "\\n\n"; else cout << delimiter.substr(1) << '\n';
+	cout << "MultiLine: " << multi_line << '\n';
+	wcout << "ReplacerDb: " << replacerDb << '\n';
+	cout << "UTF8: " << utf_8 << '\n';
+	cout << "ShowInput: " << show_strand << '\n';
+	cout << "InputLength: " << strand_length << '\n';
+	cout << "ClearInputKey: " << clear_strand_key << '\n';
+	cout << "CtrlKey: " << cKey << ' ' << cKeyMax << '\n';
+	cout << "CloseCtrlMode: " << close_ctrl_mode << '\n';
+	cout << "LSHIFT+CtrlKey: " << LSHIFTCtrlKey << '\n';
+	cout << "RSHIFT+CtrlKey_Toggle: " << RSHIFTCtrlKeyToggle << '\n';
+	cout << "CtrlScanOnlyMode: " << ctrl_scan_only_mode << '\n';
+	cout << "RSHIFT+LSHIFT_Only: " << RSHIFTLSHIFT_Only << '\n';
+	cout << "RepeatKey: " << repeat_key << '\n';
+	cout << "PauseKey: " << PauseKey << '\n';
+	cout << "RgbScaleLayout: " << RgbScaleLayout << '\n';
+	cout << "Frequency: " << frequency << '\n';
+	cout << "Ignore_0-9: " << ignore09 << '\n';
+	wcout << "Kb_Key_0: " << Kb_Key_0 << '\n';
+	wcout << "Kb_Key_1: " << Kb_Key_1 << '\n';
+	wcout << "Kb_Key_2: " << Kb_Key_2 << '\n';
+	wcout << "Kb_Key_3: " << Kb_Key_3 << '\n';
+	wcout << "Kb_Key_4: " << Kb_Key_4 << '\n';
+	wcout << "Kb_Key_5: " << Kb_Key_5 << '\n';
+	wcout << "Kb_Key_6: " << Kb_Key_6 << '\n';
+	wcout << "Kb_Key_7: " << Kb_Key_7 << '\n';
+	wcout << "Kb_Key_8: " << Kb_Key_8 << '\n';
+	wcout << "Kb_Key_9: " << Kb_Key_9 << '\n';
+	cout << "Ignore_A-Z: " << ignoreAZ << '\n';
+	wcout << "Kb_Key_A: " << Kb_Key_A << '\n';
+	wcout << "Kb_Key_B: " << Kb_Key_B << '\n';
+	wcout << "Kb_Key_C: " << Kb_Key_C << '\n';
+	wcout << "Kb_Key_D: " << Kb_Key_D << '\n';
+	wcout << "Kb_Key_E: " << Kb_Key_E << '\n';
+	wcout << "Kb_Key_F: " << Kb_Key_F << '\n';
+	wcout << "Kb_Key_G: " << Kb_Key_G << '\n';
+	wcout << "Kb_Key_H: " << Kb_Key_H << '\n';
+	wcout << "Kb_Key_I: " << Kb_Key_I << '\n';
+	wcout << "Kb_Key_J: " << Kb_Key_J << '\n';
+	wcout << "Kb_Key_K: " << Kb_Key_K << '\n';
+	wcout << "Kb_Key_L: " << Kb_Key_L << '\n';
+	wcout << "Kb_Key_M: " << Kb_Key_M << '\n';
+	wcout << "Kb_Key_N: " << Kb_Key_N << '\n';
+	wcout << "Kb_Key_O: " << Kb_Key_O << '\n';
+	wcout << "Kb_Key_P: " << Kb_Key_P << '\n';
+	wcout << "Kb_Key_Q: " << Kb_Key_Q << '\n';
+	wcout << "Kb_Key_R: " << Kb_Key_R << '\n';
+	wcout << "Kb_Key_S: " << Kb_Key_S << '\n';
+	wcout << "Kb_Key_T: " << Kb_Key_T << '\n';
+	wcout << "Kb_Key_U: " << Kb_Key_U << '\n';
+	wcout << "Kb_Key_V: " << Kb_Key_V << '\n';
+	wcout << "Kb_Key_W: " << Kb_Key_W << '\n';
+	wcout << "Kb_Key_X: " << Kb_Key_X << '\n';
+	wcout << "Kb_Key_Y: " << Kb_Key_Y << '\n';
+	wcout << "Kb_Key_Z: " << Kb_Key_Z << '\n';
+	cout << "Ignore_Arrows: " << ignoreArrows << '\n';
+	wcout << "Kb_Key_Left: " << Kb_Key_Left << '\n';
+	wcout << "Kb_Key_Up: " << Kb_Key_Up << '\n';
+	wcout << "Kb_Key_Right: " << Kb_Key_Right << '\n';
+	wcout << "Kb_Key_Down: " << Kb_Key_Down << '\n';
+	wcout << "Kb_Key_Backslash: " << Kb_Key_Backslash << '\n';
+	wcout << "Kb_Key_Caps: " << Kb_Key_Caps << '\n';
+	wcout << "Kb_Key_Comma: " << Kb_Key_Comma << '\n';
+	wcout << "Kb_Key_Delete: " << Kb_Key_Delete << '\n';
+	wcout << "Kb_Key_End: " << Kb_Key_End << '\n';
+	wcout << "Kb_Key_Enter: " << Kb_Key_Enter << '\n';
+	wcout << "Kb_Key_Equal: " << Kb_Key_Equal << '\n';
+	wcout << "Kb_Key_Esc: " << Kb_Key_Esc << '\n';
+	cout << "Ignore_F1-F12: " << ignoreF1s << '\n';
+	wcout << "Kb_Key_F1: " << Kb_Key_F1 << '\n';
+	wcout << "Kb_Key_F2: " << Kb_Key_F2 << '\n';
+	wcout << "Kb_Key_F3: " << Kb_Key_F3 << '\n';
+	wcout << "Kb_Key_F4: " << Kb_Key_F4 << '\n';
+	wcout << "Kb_Key_F5: " << Kb_Key_F5 << '\n';
+	wcout << "Kb_Key_F6: " << Kb_Key_F6 << '\n';
+	wcout << "Kb_Key_F7: " << Kb_Key_F7 << '\n';
+	wcout << "Kb_Key_F8: " << Kb_Key_F8 << '\n';
+	wcout << "Kb_Key_F9: " << Kb_Key_F9 << '\n';
+	wcout << "Kb_Key_F10: " << Kb_Key_F10 << '\n';
+	wcout << "Kb_Key_F11: " << Kb_Key_F11 << '\n';
+	wcout << "Kb_Key_F12: " << Kb_Key_F12 << '\n';
+	wcout << "Kb_Key_Print_Screen: " << Kb_Key_Print_Screen << '\n';
+	wcout << "Kb_Key_Forwardslash: " << Kb_Key_Forwardslash << '\n';
+	wcout << "Kb_Key_Grave_Accent: " << Kb_Key_Grave_Accent << '\n';
+	wcout << "Kb_Key_Home: " << Kb_Key_Home << '\n';
+	wcout << "Kb_Key_Insert: " << Kb_Key_Insert << '\n';
+	wcout << "Kb_Key_Left_Alt: " << Kb_Key_Left_Alt << '\n';
+	wcout << "Kb_Key_Left_Bracket: " << Kb_Key_Left_Bracket << '\n';
+	wcout << "Kb_Key_Left_Ctrl: " << Kb_Key_Left_Ctrl << '\n';
+	wcout << "Kb_Key_Left_Shift: " << Kb_Key_Left_Shift << '\n';
+	wcout << "Kb_Key_Menu: " << Kb_Key_Menu << '\n';
+	wcout << "Kb_Key_Minus: " << Kb_Key_Minus << '\n';
+	cout << "Ignore_NumPad: " << ignoreNumPad << '\n';
+	wcout << "Kb_Key_Numpad_0: " << Kb_Key_Numpad_0 << '\n';
+	wcout << "Kb_Key_Numpad_1: " << Kb_Key_Numpad_1 << '\n';
+	wcout << "Kb_Key_Numpad_2: " << Kb_Key_Numpad_2 << '\n';
+	wcout << "Kb_Key_Numpad_3: " << Kb_Key_Numpad_3 << '\n';
+	wcout << "Kb_Key_Numpad_4: " << Kb_Key_Numpad_4 << '\n';
+	wcout << "Kb_Key_Numpad_5: " << Kb_Key_Numpad_5 << '\n';
+	wcout << "Kb_Key_Numpad_6: " << Kb_Key_Numpad_6 << '\n';
+	wcout << "Kb_Key_Numpad_7: " << Kb_Key_Numpad_7 << '\n';
+	wcout << "Kb_Key_Numpad_8: " << Kb_Key_Numpad_8 << '\n';
+	wcout << "Kb_Key_Numpad_9: " << Kb_Key_Numpad_9 << '\n';
+	wcout << "Kb_Key_Numlock: " << Kb_Key_Numlock << '\n';
+	wcout << "Kb_Key_Numpad_Divide: " << Kb_Key_Numpad_Divide << '\n';
+	wcout << "Kb_Key_Numpad_Multiply: " << Kb_Key_Numpad_Multiply << '\n';
+	wcout << "Kb_Key_Numpad_Minus: " << Kb_Key_Numpad_Minus << '\n';
+	wcout << "Kb_Key_Numpad_Add: " << Kb_Key_Numpad_Add << '\n';
+	wcout << "Kb_Key_Numpad_Period: " << Kb_Key_Numpad_Period << '\n';
+	wcout << "Kb_Key_Numpad_Enter: " << Kb_Key_Numpad_Enter << '\n';
+	wcout << "Kb_Key_Period: " << Kb_Key_Period << '\n';
+	wcout << "Kb_Key_PgDn: " << Kb_Key_PgDn << '\n';
+	wcout << "Kb_Key_PgUp: " << Kb_Key_PgUp << '\n';
+	wcout << "Kb_Key_Quote: " << Kb_Key_Quote << '\n';
+	wcout << "Kb_Key_Right_Alt: " << Kb_Key_Right_Alt << '\n';
+	wcout << "Kb_Key_Right_Bracket: " << Kb_Key_Right_Bracket << '\n';
+	wcout << "Kb_Key_Right_Ctrl: " << Kb_Key_Right_Ctrl << '\n';
+	wcout << "Kb_Key_Right_Shift: " << Kb_Key_Right_Shift << '\n';
+	wcout << "Kb_Key_Semicolon: " << Kb_Key_Semicolon << '\n';
+	wcout << "Kb_Key_Space: " << Kb_Key_Space << '\n';
+	wcout << "Kb_Key_Tab: " << Kb_Key_Tab << '\n';
+	cout << "AutoBs_RepeatKey: " << auto_bs_repeat_key << '\n';
+	wcout << "Editor: " << editor << '\n';
+	wcout << "EditorDb: "; wcout << editorDb << '\n';
+	wcout << "EditorSe: "; wcout << editorSe << '\n';
+	wcout << "Loop_Insert_Text: " << Loop_Insert_Text << '\n';
+	wcout << "ManualRepeat: " << ManualRepeat << '\n';
+	cout << endl;
 }
 
 static void mouseEvent(short key) {
@@ -1333,7 +1329,7 @@ Set se.txt [RgbScaleLayout] to match Display settings > Scale & layout. [1.00] i
 <ifrgb:>	Continue running if rgbxy is true
 <ifrgb~:>	Use ~ to set mouse pointer to x y if r g b is true
 
-Syntax		Use either & or | 
+Syntax		Use either & or | (optional)
 <ifrgb~: 'r g b x y & r g b x y, *, ms n, t: f:'>
 
 <ifcb:>		Options:
@@ -1357,12 +1353,14 @@ Manual controls:
 <!!:>	Set repeat
 
 misc.
-Use legacy terminal: Terminal settings > Terminal > Windows Console Host
 Use \\\\g for > in <ifapp:>
 Other: \, \| \&
 
-Use blank line or ; for se.txt [MultiLine: 1]
-Enable in VS Code: "[plaintext]": { "editor.insertSpaces": false,
+Use blank line or ; as delimiter in db.txt if [MultiLine: 1]
+
+External:
+Use legacy terminal: Terminal settings > Windows Console Host
+VS Code: "[plaintext]": { "editor.insertSpaces": false,
 )";
 
 }
@@ -3480,8 +3478,6 @@ RgbScaleLayout			1.00
 		}
 
 	}
-
-
 
 	return 0;
 
