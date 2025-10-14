@@ -132,41 +132,46 @@ static void make_vdb_table() {
 
 	f.imbue(locale("en_us.utf8"));
 
-	wstring cell;
-	string cells;
-
-	c = 0; //multi_line
-	if (strand[0]) strand.clear();
-	
 	Strand s{};
 	Strand_out s_o{};
 
-	bool b = 0;
-	auto nt = [&b](wstring& x) {
-		b = 0;
-		size_t y = x.length();
-		x = regex_replace(x, wregex(L"\n"), L"");
-		x = regex_replace(x, wregex(L"\t"), L"");
-		return b = x.length() != y;
-		};
+	wstring cell;
+	string cell0, cells;
 
-	while (getline(f, cells, delimiter[0])) {
+	while (getline(f, multi_line ? cell0 : cells, delimiter[0])) {
 
-		if (!cells[0] || cells[0] == ' ') continue;
+		if (multi_line) {
+			cells += cell0;
+			if (cell0[0] && cell0[cell0.length() - 1] == '\\') {
+				if (cell0[cell0.length() - 2] == '\\') { cells.pop_back(); continue; }
+				cells.pop_back();
+			}
+			else continue;
+			multi_line = 0;
+		}
+		else {
+			if (!cells[0] || cells[0] == ' ') continue;
 
-		if (cells.substr(0, 4) == "<'''")
-			break;
-
-		s.in.clear(); s.g.clear(); s.ft = 0;
-		s_o.out.clear();
+			if (cells[1] == '\'' && cells.substr(0, 4) == "<'''")
+				break;
+		}
 
 		cell = utf8_to_wstring(cells);
 
-		if (multi_line || delimiter[0] != '\n') nt(cell);
-
+		if (delimiter[0] != '\n') cell = regex_replace(cell, wregex(L"\n"), L"");
+		cell = regex_replace(cell, wregex(L"\t"), L"");
 
 		//io
+		s.in.clear(); s.g.clear(); s.ft = 0;
+		s_o.out.clear();
+		
 		s.in = cell.substr(0, cell.find_first_of(L" -:>"));
+		if (s.in[s.in.length() - 1] == '\\' && delimiter[0] == '\n') { //multi_line
+			multi_line = 1;
+			s.in.pop_back();
+			cells = wstring_to_utf8(s.in) + cells.substr(s.in.length() + 1);
+			continue;
+		}
 
 		if (!s.g[0]) {
 			s.g = cell.substr(s.in.length(), 1);
@@ -174,51 +179,14 @@ static void make_vdb_table() {
 		}
 
 		s_o.out = cell.substr(s.in.length() + s.g.length());
+		if (!s_o.out[0]) s.ft = 1;
 
 		if (s.in[0] == '<')
 			s.in += s.g;
 
 
-		//multi_line
-		if (multi_line && s.g[0] && cell[0] != ' ') {
-			if (s_o.out[0] && s_o.out[s_o.out.length() - 1] == ';') {
-				s_o.out.pop_back();
-				strand = s_o.out;
-			}
-			else if (b) {
-				while (1) {
-					getline(f, cells, delimiter[0]);
-					if (s_o.out[0] && !cells[0] || cells.substr(0, 4) == "<'''") {
-						strand += s_o.out; break;
-					}
-					cell = utf8_to_wstring(cells);
-
-
-					if (cell[0]) nt(cell); else b = 0;
-
-					if (s_o.out[0]) { strand = s_o.out; s_o.out.clear(); }
-					strand += cell;
-
-
-					if (!cell[0] && !b || cell[0] && cell[cell.length() - 1] == ';') {
-						if (cell[0]) strand.pop_back();
-						break;
-					}
-				}
-
-				s_o.out = strand;
-			}
-			if (strand[0]) strand.clear();
-
-		}
-
-
-		if (!s_o.out[0]) s.ft = 1;
 		vstrand.push_back(s);
 		vstrand_out.push_back(s_o);
-
-		if (multi_line && cells.substr(0, 4) == "<'''")
-			break;
 
 	}
 	f.close();
@@ -414,8 +382,8 @@ static void load_settings() {
 
 		auto er = [se, v]() { showOutsMsg(L"", L"\\4Error\\7 in \\0C\\" + settings + L"\\0C\\ \\4[" + se + L" " + v + L"]\\7\\n", L"", 1); ShowWindow(GetConsoleWindow(), SW_RESTORE); SetForegroundWindow(GetConsoleWindow()); };
 		switch (x) {
-		case 973://MultiLine:
-		{ if (v == L"0" || v == L"1") multi_line = stoi(v); else er(); } break;
+		//case 973://MultiLine:
+		//{ if (v == L"0" || v == L"1") multi_line = stoi(v); else er(); } break;
 		case 545://Debug:
 		{ if (v == L"0" || v == L"1" || v == L"2") debug = stoi(v); else er(); } break;
 		case 353://UTF8:
@@ -719,9 +687,6 @@ static void load_settings() {
 	else
 		ignoreOtherKeys = 1;
 
-	if (delimiter[0] != '\n') multi_line = 0;
-	if (multi_line) delimiter = '\n';
-
 	f.close();
 	clear_all_keys();
 }
@@ -733,7 +698,7 @@ static void printSe() {
 	wcout << "Settings: " << settings << '\n';
 	wcout << "Database: " << database << '\n';
 	cout << "DbMultiLineDelimiter: "; if (delimiter[0] == '\n') cout << "\\n\n"; else cout << delimiter.substr(1) << '\n';
-	cout << "MultiLine: " << multi_line << '\n';
+	//cout << "MultiLine: " << multi_line << '\n';
 	wcout << "ReplacerDb: " << replacerDb << '\n';
 	cout << "UTF8: " << utf_8 << '\n';
 	cout << "ShowInput: " << show_strand << '\n';
@@ -1356,10 +1321,10 @@ misc.
 Use \\\\g for > in <ifapp:>
 Other: \, \| \&
 
-Use blank line or ; as delimiter in db.txt if [MultiLine: 1]
+i\>o\ (multi line option)
 
 External:
-Use legacy terminal: Terminal settings > Windows Console Host
+Use legacy terminal: WIN + "Terminal settings" > Windows Console Host
 VS Code: "[plaintext]": { "editor.insertSpaces": false,
 )";
 
