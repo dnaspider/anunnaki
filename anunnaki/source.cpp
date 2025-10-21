@@ -40,7 +40,7 @@ wstring strand = L"";
 wstring qq = L"", qp = L"", qx = L"", qy = L"";
 wstring repeats = L"";
 wstring Loop_Insert_Text = L"";
-wstring out = L"", in = L"";
+wstring out = L"";
 string delimiter = "\n"; //°";
 double RgbScaleLayout = 1.00; //100%
 double ic = 0; //<+> icp
@@ -86,7 +86,6 @@ struct Multi_ {
 	wstring out_,
 		qq_ = qq,
 		qp_ = qp,
-		strand_ = strand,
 		store_ = L"";
 	double
 		icp_ = 0;
@@ -183,13 +182,15 @@ static void make_vdb_table() {
 
 		if (s.in[0] == '<')
 			s.in += s.g;
-
+		//io
 
 		vstrand.push_back(s);
 		vstrand_out.push_back(s_o);
 
 	}
 	f.close();
+
+	vstrand.shrink_to_fit();
 }
 
 static wstring getTime(wstring& w) {
@@ -382,8 +383,6 @@ static void load_settings() {
 
 		auto er = [se, v]() { showOutsMsg(L"", L"\\4Error\\7 in \\0C\\" + settings + L"\\0C\\ \\4[" + se + L" " + v + L"]\\7\\n", L"", 1); ShowWindow(GetConsoleWindow(), SW_RESTORE); SetForegroundWindow(GetConsoleWindow()); };
 		switch (x) {
-		//case 973://MultiLine:
-		//{ if (v == L"0" || v == L"1") multi_line = stoi(v); else er(); } break;
 		case 545://Debug:
 		{ if (v == L"0" || v == L"1" || v == L"2") debug = stoi(v); else er(); } break;
 		case 353://UTF8:
@@ -698,7 +697,6 @@ static void printSe() {
 	wcout << "Settings: " << settings << '\n';
 	wcout << "Database: " << database << '\n';
 	cout << "DbMultiLineDelimiter: "; if (delimiter[0] == '\n') cout << "\\n\n"; else cout << delimiter.substr(1) << '\n';
-	//cout << "MultiLine: " << multi_line << '\n';
 	wcout << "ReplacerDb: " << replacerDb << '\n';
 	cout << "UTF8: " << utf_8 << '\n';
 	cout << "ShowInput: " << show_strand << '\n';
@@ -962,13 +960,13 @@ static bool npos_find(wstring& w, char c, bool b = 1) {
 		: w.find(c) == string::npos;
 }
 
-static void setQxQy(wstring x, size_t z = 0) {
+static void setQxQy(wstring x) {
 	if (x.find(',') != string::npos) {
-		qx = x.substr(z, x.find(','));//x <xy:#,#>
+		qx = x.substr(0, x.find(','));//x <xy:#,#>
 		qy = x.substr(x.find(',') + 1, x.find('>') - x.find(',') - 1);//y
 	}
-	else if (npos_find(x, ' ')) {
-		qx = x.substr(z, x.find(' '));//x <xy:# #>
+	else if (x.find(' ') != string::npos) {
+		qx = x.substr(0, x.find(' '));//x <xy:# #>
 		qy = x.substr(x.find(' ') + 1, x.find('>') - x.find(' ') - 1);
 	}
 	else { qx.clear(), qy.clear(); }
@@ -976,21 +974,24 @@ static void setQxQy(wstring x, size_t z = 0) {
 }
 
 static wstring get_out(wstring q = L"") {
-	if (q[0] != '<') {
-		if (q[q.length() - 1] == '>')
-			q.pop_back();
-		if (q[q.length() - 1] == ':' || q[q.length() - 1] == '-' || q[q.length() - 1] == ' ')
-			q.pop_back();
-	}
+	wstring i, g;
+	
+	i = q.substr(0, q.find_first_of(L" -:>"));
 
-	for (size_t i = 0; i < vstrand.size(); ++i)
-		if (vstrand.at(i).in == q)
-			return vstrand_out.at(i).out;
+	g = q.substr(i.length(), 1);
+	if (g[0] && g[0] != '>') g += q[i.length() + 1] == '>' ? L">" : L"";
+	
+	if (i[0] == '<')
+		i += g;
+
+	for (size_t n = 0; n < vstrand.size(); ++n)
+		if (vstrand.at(n).in + vstrand.at(n).g == i + g)
+			return vstrand_out.at(n).out;
 
 	return L"";
 }
 
-static wstring is_replacer(wstring& q) { // Replacer | {var} {var:} {var-} {var>} | <r:>
+static wstring is_replacer(wstring& q) { // Replacer | {var:} {var-} {var>} | <r:>
 	if (!replacerDb[0]) return q;
 	if (q.find('{') != string::npos && q.find('}') != string::npos) {
 		wstring tqg = q, tq{};
@@ -1122,6 +1123,7 @@ Syntax
 i o		Auto backspace input
 i-o
 i>o		Remember input for RepeatKey
+i\>o\	Use this format to ignore \t \n
 Press RCTRL after input to run
 
 <x:>1		Link
@@ -1268,7 +1270,7 @@ t <shift><left3><shift-><ctrl>x<ctrl->
 Sleep
 <,>		160 milliseconds
 <,1000>		1000 ms
-<,10000 40>	Escapable (n). Use SPACE (optional)
+<,10000 40>	Make it escapable (Hold ESC). Use SPACE (n)
 
 Output speed
 <speed:160>
@@ -1292,7 +1294,7 @@ Audio:
 
 Set se.txt [RgbScaleLayout] to match Display settings > Scale & layout. [1.00] is 100%
 <ifrgb:>	Continue running if rgbxy is true
-<ifrgb~:>	Use ~ to set mouse pointer to x y if r g b is true
+<ifrgb~:>	Use ~ to move mouse pointer to x y if r g b is true
 
 Syntax		Use either & or | (optional)
 <ifrgb~: 'r g b x y & r g b x y, *, ms n, t: f:'>
@@ -1305,7 +1307,7 @@ Syntax		Use either & or | (optional)
 <ifcbE:>	Ends with
 <ifcblen:>	Length
 
-<ifxy:>
+<ifxy:>		Same logical options
 
 <xy>	Type
 <rgb>
@@ -1316,12 +1318,17 @@ Syntax		Use either & or | (optional)
 Manual controls:
 <!:>	Set input; return
 <!!:>	Set repeat
+<!!!:>	Detach run
 
 misc.
 Use \\\\g for > in <ifapp:>
 Other: \, \| \&
 
-i\>o\ (multi line option)
+LCTRL+S inside
+[EditorDb] to rebuild [Database]
+[EditorSe] push new settings
+
+[Debug 2] Assume
 
 External:
 Use legacy terminal: WIN + "Terminal settings" > Windows Console Host
@@ -1431,7 +1438,6 @@ static void if_esc_pause(Multi_ multi_) {
 		multi_.out_ = out;
 		multi_.qq_ = qq;
 		multi_.qp_ = qp;
-		//multi_.strand_ = strand;
 		multi_.c_ = c;
 
 		while (GetAsyncKeyState(PauseKey) != 0)
@@ -1461,7 +1467,6 @@ static void if_esc_pause(Multi_ multi_) {
 			out = multi_.out_;
 			qq = multi_.qq_;
 			qp = multi_.qp_;
-			//strand = multi_.strand_;
 			c = multi_.c_;
 		}
 	}
@@ -1474,7 +1479,7 @@ static void multi_sleep(Multi_ multi_, unsigned long ms, unsigned long n = 1) {
 		multi_.qp_ = qp;
 		multi_.c_ = c;
 
-		if (n > 1) {
+		if (n > 1 && ms > n) {
 			for (size_t i = 0; i < n; ++i) {
 				if_esc_pause(multi_);
 				if (stop) { break; }
@@ -1626,7 +1631,7 @@ static void scan_db() {
 				case '<':
 					qq = out.substr(c, out.length() - c); //<test>
 					if (qq.substr(0, qq.find('>')).find(':') != std::string::npos) { //<test:#>
-						qp = qq.substr(qq.find(':') + 1, qq.find('>') - qq.find(':') - 1);//#
+						qp = qq.substr(qq.find(':') + 1, qq.find('>') - qq.find(':') - 1); //#
 						if (qp[0]) {
 							if (qp[0] == ' ') qp = qp.substr(1);
 							setQxQy(qp);
@@ -1635,7 +1640,7 @@ static void scan_db() {
 					switch (qq[1]) {
 					case '<':
 					case ':':
-						if (testqqb(L"<:") || testqqb(L"<<:")) {//cout
+						if (testqqb(L"<:") || testqqb(L"<<:")) { //cout
 							showOutsMsg(L"", qp, L"", 1);
 							rei();
 							break;
@@ -1643,7 +1648,7 @@ static void scan_db() {
 						else connect(out);
 						break;
 					case '#':
-						if (testqqb(L"<#:")) {//ascii_calc
+						if (testqqb(L"<#:")) { //ascii_calc
 							if (qp.find('\\') != string::npos) qp = regex_replace(qx, wregex(L"\\\\g"), L">");
 							int s{}; for (auto& x : qp) s += x;
 							auto q = to_wstring(s);	cbSet(q);
@@ -2852,8 +2857,10 @@ static void scan_db() {
 			}
 
 			if (debug == 1) {
-				wcout << "\ninput: " << in << endl;
-				wcout << "output: " << out << endl;
+				wcout << "\ninput: " << vstrand.at(i).in << '\n';
+				wcout << "g: " << vstrand.at(i).g << '\n';
+				wcout << "output: " << vstrand_out.at(i).out << '\n';
+				//wcout << "repeat: " << repeat << '\n';
 			}
 
 			if (multi_.store_[0]) repeats = multi_.store_;
