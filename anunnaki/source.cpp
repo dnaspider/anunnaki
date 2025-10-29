@@ -1053,7 +1053,7 @@ static wstring connect(wstring& w, bool bg = 0) {
 				return is_replacer(o);
 
 			w = o + qq.substr(qqs.length());
-			w = is_replacer(w);
+			is_replacer(w);
 			c = -1;
 			if (out_speed > 0) out_sleep = 0;
 			return L"";
@@ -1115,30 +1115,27 @@ H+ESC		Toggle visibility
 P+ESC		<xy:>
 A+ESC		<ifapp~:>
 R+ESC		<ifrgb:>
-L+ESC		Toggle [RSHIFT+LSHIFT_Only 2]
-G+ESC		RGBXY to clipboard in 3 sec.
+L+ESC		Toggle [se.txt RSHIFT+LSHIFT_Only]
+G+ESC		RGBXY to clipboard (cb) in 3 sec.
 Set mouse pointer over target, press G+ESC, then move it away
 
-Syntax
-i o		Auto backspace input
+Syntax (c:\anu\db.txt)
+i o		Use space or - for auto backspace input
 i-o
-i>o		Remember input for RepeatKey
-i\>o\	Use this format to ignore \t \n
-Press RCTRL after input to run
+i>o		Use > for remember input for [RepeatKey]
 
-<x:>1		Link
-i <x:>
+i\>o\		Use this format to ignore tabs and new lines
+
+<i:>o		Link
+i <i:>
 
 i		Fallthrough
-ii
-q 1
-Press I, II, or Q RCTRL to run
+ii o
 
-CtrlKey	options:
-RCTRL, F2, RSHIFT+LSHIFT, COMMA+ESC
+Use RCTRL (163), F2 (>), RSHIFT+LSHIFT, or COMMA+ESC after input to run
 
-RepeatKey options:
-PAUSE, RCTRL+LCTRL, EQUAL+ESC
+Repeat:
+Use PAUSE (19), RCTRL+LCTRL, or EQUAL+ESC
 
 Clear input:
 Hold RSHIFT, Press LSHIFT three times
@@ -1146,6 +1143,8 @@ Hold RSHIFT, Press LSHIFT three times
 Settings
 <se>		Reload, print to console. Use SE to only print
 <se:>		Load other
+
+Example:
 <test ><SE>
 
 Database
@@ -1321,7 +1320,7 @@ Manual controls:
 <!!!:>	Detach run
 
 misc.
-Use \\\\g for > in <ifapp:>
+Use \\\\g for > in <ifapp:>. Everywhere else \g
 Other: \, \| \&
 
 LCTRL+S inside
@@ -1606,7 +1605,7 @@ static void scan_db() {
 
 			//run output
 
-			if (replacerDb[0]) out = is_replacer(out); //<r:>
+			if (replacerDb[0]) is_replacer(out); //<r:>
 
 			Multi_ multi_;
 
