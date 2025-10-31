@@ -31,7 +31,7 @@ in-out
 in:out
 in>out
 
-Use space or - for auto backspace the in.
+Use space or - for auto backspace in.
 
 Emoji example:
 
@@ -68,5 +68,6 @@ in &lt;xy~:273 1365>&lt;,>&lt;lc>&lt;~~>
 Maybe thats not enough time (160ms default).
 Add more milliseconds to this like so: &lt;,1000> (this is one second).
 
-Any questions? Hit me up on X or the discussion. Enjoy!
+Any questions? Hit me up on 𝕏 or Discussions.
+Enjoy!
 </pre>
