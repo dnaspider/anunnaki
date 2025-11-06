@@ -52,15 +52,16 @@ unsigned short out_speed = 0;
 unsigned short frequency = 160;
 unsigned short strand_length = 2;
 unsigned short RSHIFTLSHIFT_Only = 0, rri = 0;
-unsigned short cKey = VK_RCONTROL, cKeyMax = 9;
+unsigned short cKey = VK_RCONTROL, cKeyMax = 3;
 unsigned short repeat_key = VK_PAUSE;
 unsigned short PauseKey = VK_F12; //123
 unsigned short clear_strand_key = 0; //VK_F12;
 unsigned short RSHIFTCtrlKeyToggle = 9;
-unsigned short LSHIFTCtrlKey = 9;
+unsigned short LSHIFTCtrlKey = 3;
 unsigned short repeat_switch = 0;
 unsigned short debug = 0;
-unsigned short mvdb = 0; //make vstrand to 
+unsigned short mvdb = 0; //make vstrand to
+bool async{};
 bool multi_line = 0; //<x > \n\n
 bool start_hidden = 0;
 bool show_strand = 1;
@@ -383,6 +384,8 @@ static void load_settings() {
 
 		auto er = [se, v]() { showOutsMsg(L"", L"\\4Error\\7 in \\0C\\" + settings + L"\\0C\\ \\4[" + se + L" " + v + L"]\\7\\n", L"", 1); ShowWindow(GetConsoleWindow(), SW_RESTORE); SetForegroundWindow(GetConsoleWindow()); };
 		switch (x) {
+		case 568://Async:
+		{ if (v == L"0" || v == L"1") async = stoi(v); else er(); } break;
 		case 545://Debug:
 		{ if (v == L"0" || v == L"1" || v == L"2") debug = stoi(v); else er(); } break;
 		case 353://UTF8:
@@ -686,6 +689,11 @@ static void load_settings() {
 	else
 		ignoreOtherKeys = 1;
 
+	if (!async) { //vk to scancode
+		if (repeat_key == VK_PAUSE) repeat_key = 69;
+		//if (cKey == 163) cKey = 29;
+	}
+
 	f.close();
 	clear_all_keys();
 }
@@ -699,6 +707,8 @@ static void printSe() {
 	cout << "DbMultiLineDelimiter: "; if (delimiter[0] == '\n') cout << "\\n\n"; else cout << delimiter.substr(1) << '\n';
 	wcout << "ReplacerDb: " << replacerDb << '\n';
 	cout << "UTF8: " << utf_8 << '\n';
+	cout << "Async: " << async << '\n';
+	cout << "Debug: " << debug << '\n';
 	cout << "ShowInput: " << show_strand << '\n';
 	cout << "InputLength: " << strand_length << '\n';
 	cout << "ClearInputKey: " << clear_strand_key << '\n';
@@ -902,7 +912,7 @@ static void kb_press(wstring s, short key) {
 	qx = qx.substr(0, qx.length() - (qx[qx.length() - 1] == '>'));
 	if (qx[0] == ' ') qx = qx.substr(1);
 	if (!qx[0]) qx = L"1";
-	if (qx[0] < '0' || qx[0] > '9') { //check_if_num
+	if (check_if_num(qx, L"<key #>") == L"") { //if (qx[0] < '0' || qx[0] > '9')
 		printq(); rei(); return;
 	}
 	unsigned short x = stoi(qx);
@@ -1328,6 +1338,8 @@ LCTRL+S inside
 [EditorSe] push new settings
 
 [Debug 2] Assume
+[Async 0] Sc mode
+[Async 1] Vk mode
 
 External:
 Use legacy terminal: WIN + "Terminal settings" > Windows Console Host
@@ -2989,6 +3001,503 @@ static void key(wstring k) {
 
 #pragma comment(lib, "Winmm.lib")//<audio:>
 
+unsigned short breaker{};
+bool isWinKeyPressed{};
+bool isLshiftPressed{};
+bool isRshiftPressed{};
+bool rshift_lshift{};
+bool isLctrlPressed{};
+bool isRctrlPressed{};
+bool repeated{};
+bool toggled{};
+
+static LRESULT CALLBACK LowLevelKeyboardProc(int nCode, WPARAM wParam, LPARAM lParam) {
+	if (nCode == HC_ACTION) {
+		PKBDLLHOOKSTRUCT p = (PKBDLLHOOKSTRUCT)lParam;
+	
+		if (p->flags & LLKHF_INJECTED || p->flags & LLKHF_ALTDOWN)
+			return 0;
+		
+		switch (wParam) {
+			case WM_KEYDOWN:
+			case WM_SYSKEYDOWN: {
+				if (debug == 1) printf("Virtual Key = %d, Scan Code = %d\n", p->vkCode, p->scanCode);
+
+				//Block Win
+				if (p->scanCode == 91 || p->scanCode == 92) { isWinKeyPressed = 1; return 0; }
+				if (isWinKeyPressed) return 0;
+
+				//Shift
+				if (p->scanCode == 42)
+					isLshiftPressed = 1;
+				if (p->scanCode == 54) { 
+					GetAsyncKeyState(VK_LSHIFT); if (GetAsyncKeyState(VK_LSHIFT))
+						++breaker;
+					isRshiftPressed = 1;
+				}
+				if (isLshiftPressed) ++breaker;
+				if (isLshiftPressed || isRshiftPressed) break;
+
+				//VK_BACK
+				if (p->scanCode == 14) {
+					if (!strand[0]) { if (rri) rri = 0; return 0; }
+
+					if (utf_8 && strand[strand.length() - 1] > 127) {
+						strand = strand.substr(0, strand.length() - 2);
+					}
+					else
+						strand.pop_back();
+					prints();
+					return 0;
+				}
+
+				//Ctrl
+				bool extended = (p->flags & LLKHF_EXTENDED) != 0;
+				if (p->scanCode == 29) {
+					if (!extended)
+						isLctrlPressed = 1;
+					else
+						isRctrlPressed = 1;
+				}
+				if (isRctrlPressed) ++breaker;
+				if (isLctrlPressed || isRctrlPressed) break;
+
+				if (p->scanCode == repeat_key) {
+					if (auto_bs_repeat_key) {
+						kb(VK_BACK); GetAsyncKeyState(VK_BACK);
+					}
+					repeat();
+					return 0;
+				}
+
+				//VK_ESCAPE
+				if (p->scanCode == 1) {
+					GetAsyncKeyState('P'); if (GetAsyncKeyState('P')) { //p + esc: <xy:>
+						kb_release(VK_ESCAPE); kb(VK_BACK); GetAsyncKeyState(VK_BACK);
+						repeat_switch = 1;
+						repeat();
+						return 0;
+					}
+					GetAsyncKeyState('R'); if (GetAsyncKeyState('R')) { //r + esc: <rgb:>
+						kb_release(VK_ESCAPE); kb(VK_BACK); GetAsyncKeyState(VK_BACK);
+						repeat_switch = 2;
+						repeat();
+						return 0;
+					}
+					GetAsyncKeyState('G'); if (GetAsyncKeyState('G')) { //g + esc: <RGB~:> to cb
+						kb_release(VK_ESCAPE); kb(VK_BACK); GetAsyncKeyState(VK_BACK);
+						repeat_switch = 3;
+						repeat();
+						return 0;
+					}
+					GetAsyncKeyState('A'); if (GetAsyncKeyState('A')) { //a + esc: <app:>
+						kb_release(VK_ESCAPE); kb(VK_BACK); GetAsyncKeyState(VK_BACK);
+						repeat_switch = 4;
+						repeat();
+						return 0;
+					}
+					GetAsyncKeyState(VK_OEM_PLUS); if (GetAsyncKeyState(VK_OEM_PLUS)) { //= + esc: repeat
+						kb_release(VK_ESCAPE); kb(VK_BACK); GetAsyncKeyState(VK_BACK);
+						repeat(); return 0;
+					}
+					GetAsyncKeyState(VK_OEM_COMMA); if (GetAsyncKeyState(VK_OEM_COMMA)) { //, + esc
+						rshift_lshift = 1;
+						return 0;
+					}
+					GetAsyncKeyState('L'); if (GetAsyncKeyState('L')) { //L + esc
+						kb(VK_BACK); GetAsyncKeyState(VK_BACK);
+						static unsigned short escL = RSHIFTLSHIFT_Only;
+						if (RSHIFTLSHIFT_Only) RSHIFTLSHIFT_Only = 0;
+						else RSHIFTLSHIFT_Only = escL ? escL : 2;
+						strand.clear(); clear_all_keys(); prints();
+						sleep(frequency);
+						return 0;
+					}
+					GetAsyncKeyState('X'); if (GetAsyncKeyState('X')) { //x + esc
+						kb(VK_BACK);
+						PostQuitMessage(0);
+						return 0;
+					}
+					GetAsyncKeyState('H'); if (GetAsyncKeyState('H')) { //h + esc
+						kb_release(VK_ESCAPE); kb(VK_BACK); GetAsyncKeyState(VK_BACK);
+						sleep(1);
+						toggle_visibility();
+						prints();
+						return 0;
+					}
+					GetAsyncKeyState(VK_OEM_2); if (GetAsyncKeyState(VK_OEM_2)) { //? + esc
+						kb_release(VK_ESCAPE); kb(VK_BACK); GetAsyncKeyState(VK_BACK);
+						print_ctrls();
+						ShowWindow(GetConsoleWindow(), SW_RESTORE);
+						SetForegroundWindow(GetConsoleWindow());
+						return 0;
+					}
+					if (Kb_Key_Esc[0]) { kb_release(VK_ESCAPE); key(Kb_Key_Esc); }
+					return 0;
+				}
+
+				if (ctrl_scan_only_mode && strand[0] != '<') return 0;
+
+				if (!rri && RSHIFTLSHIFT_Only && !strand[0]) return 0;
+
+				if (!ignoreAZ) {
+					switch (p->scanCode) {
+					case 30:
+						if (Kb_Key_A[0]) key(Kb_Key_A);
+						break;
+					case 48:
+						if (Kb_Key_B[0]) key(Kb_Key_B);
+						break;
+					case 46:
+						if (Kb_Key_C[0]) key(Kb_Key_C);
+						break;
+					case 32:
+						if (Kb_Key_D[0]) key(Kb_Key_D);
+						break;
+					case 18:
+						if (Kb_Key_E[0]) key(Kb_Key_E);
+						break;
+					case 33:
+						if (Kb_Key_F[0]) key(Kb_Key_F);
+						break;
+					case 34:
+						if (Kb_Key_G[0]) key(Kb_Key_G);
+						break;
+					case 35:
+						if (Kb_Key_H[0]) key(Kb_Key_H);
+						break;
+					case 23:
+						if (Kb_Key_I[0]) key(Kb_Key_I);
+						break;
+					case 36:
+						if (Kb_Key_J[0]) key(Kb_Key_J);
+						break;
+					case 37:
+						if (Kb_Key_K[0]) key(Kb_Key_K);
+						break;
+					case 38:
+						if (Kb_Key_L[0]) key(Kb_Key_L);
+						break;
+					case 50:
+						if (Kb_Key_M[0]) key(Kb_Key_M);
+						break;
+					case 49:
+						if (Kb_Key_N[0]) key(Kb_Key_N);
+						break;
+					case 24:
+						if (Kb_Key_O[0]) key(Kb_Key_O);
+						break;
+					case 25:
+						if (Kb_Key_P[0]) key(Kb_Key_P);
+						break;
+					case 16:
+						if (Kb_Key_Q[0]) key(Kb_Key_Q);
+						break;
+					case 19:
+						if (Kb_Key_R[0]) key(Kb_Key_R);
+						break;
+					case 31:
+						if (Kb_Key_S[0]) key(Kb_Key_S);
+						break;
+					case 20:
+						if (Kb_Key_T[0]) key(Kb_Key_T);
+						break;
+					case 22:
+						if (Kb_Key_U[0]) key(Kb_Key_U);
+						break;
+					case 47:
+						if (Kb_Key_V[0]) key(Kb_Key_V);
+						break;
+					case 17:
+						if (Kb_Key_W[0]) key(Kb_Key_W);
+						break;
+					case 45:
+						if (Kb_Key_X[0]) key(Kb_Key_X);
+						break;
+					case 21:
+						if (Kb_Key_Y[0]) key(Kb_Key_Y);
+						break;
+					case 44:
+						if (Kb_Key_Z[0]) key(Kb_Key_Z);
+						break;
+					}
+				}
+				if (!ignore09) {
+					switch (p->scanCode) {
+					case 2:
+						if (Kb_Key_1[0]) key(Kb_Key_1);
+						break;
+					case 3:
+						if (Kb_Key_2[0]) key(Kb_Key_2);
+						break;
+					case 4:
+						if (Kb_Key_3[0]) key(Kb_Key_3);
+						break;
+					case 5:
+						if (Kb_Key_4[0]) key(Kb_Key_4);
+						break;
+					case 6:
+						if (Kb_Key_5[0]) key(Kb_Key_5);
+						break;
+					case 7:
+						if (Kb_Key_6[0]) key(Kb_Key_6);
+						break;
+					case 8:
+						if (Kb_Key_7[0]) key(Kb_Key_7);
+						break;
+					case 9:
+						if (Kb_Key_8[0]) key(Kb_Key_8);
+						break;
+					case 10:
+						if (Kb_Key_9[0]) key(Kb_Key_9);
+						break;
+					case 11:
+						if (Kb_Key_0[0]) key(Kb_Key_0);
+						break;
+					}
+				}
+				if (!ignoreF1s) {
+					switch (p->scanCode) {
+					case 59:
+						if (Kb_Key_F1[0]) key(Kb_Key_F1);
+						break;
+					case 60:
+						if (Kb_Key_F2[0]) key(Kb_Key_F2);
+						break;
+					case 61:
+						if (Kb_Key_F3[0]) key(Kb_Key_F3);
+						break;
+					case 62:
+						if (Kb_Key_F4[0]) key(Kb_Key_F4);
+						break;
+					case 63:
+						if (Kb_Key_F5[0]) key(Kb_Key_F5);
+						break;
+					case 64:
+						if (Kb_Key_F6[0]) key(Kb_Key_F6);
+						break;
+					case 65:
+						if (Kb_Key_F7[0]) key(Kb_Key_F7);
+						break;
+					case 66:
+						if (Kb_Key_F8[0]) key(Kb_Key_F8);
+						break;
+					case 67:
+						if (Kb_Key_F9[0]) key(Kb_Key_F9);
+						break;
+					case 68:
+						if (Kb_Key_F10[0]) key(Kb_Key_F10);
+						break;
+					case 87:
+						if (Kb_Key_F11[0]) key(Kb_Key_F11);
+						break;
+					case 88:
+						if (Kb_Key_F12[0]) key(Kb_Key_F12);
+						break;
+					}
+				}
+				if (!ignoreArrows) {
+					switch (p->scanCode) {
+					case 75:
+						if (Kb_Key_Left[0]) key(Kb_Key_Left);
+						break;
+					case 72:
+						if (Kb_Key_Up[0]) key(Kb_Key_Up);
+						break;
+					case 77:
+						if (Kb_Key_Right[0]) key(Kb_Key_Right);
+						break;
+					case 80:
+						if (Kb_Key_Down[0]) key(Kb_Key_Down);
+						break;
+					}
+				}
+				if (!ignoreOtherKeys) {
+					switch (p->scanCode) {
+					case 55: if (Kb_Key_Print_Screen[0]) key(Kb_Key_Print_Screen); break;
+					case 57: if (Kb_Key_Space[0]) key(Kb_Key_Space); break;
+					case 15: if (Kb_Key_Tab[0]) key(Kb_Key_Tab); break;
+					case 42: if (Kb_Key_Left_Shift[0]) key(Kb_Key_Left_Shift); break;
+					case 54: if (Kb_Key_Right_Shift[0]) key(Kb_Key_Right_Shift); break;
+					case 29: if (Kb_Key_Left_Ctrl[0]) key(Kb_Key_Left_Ctrl); else if (Kb_Key_Right_Ctrl[0]) key(Kb_Key_Right_Ctrl); break;
+						//case 29: if (Kb_Key_Right_Ctrl[0]) key(Kb_Key_Right_Ctrl); break;
+					case 28: if (Kb_Key_Enter[0]) key(Kb_Key_Enter); break;
+					case 58: if (Kb_Key_Caps[0]) key(Kb_Key_Caps); break;
+					case 41: if (Kb_Key_Grave_Accent[0]) key(Kb_Key_Grave_Accent); break;
+					case 12: if (Kb_Key_Minus[0]) key(Kb_Key_Minus); break;
+					case 13: if (Kb_Key_Equal[0]) key(Kb_Key_Equal); break;
+					case 26: if (Kb_Key_Left_Bracket[0]) key(Kb_Key_Left_Bracket); break;
+					case 27: if (Kb_Key_Right_Bracket[0]) key(Kb_Key_Right_Bracket); break;
+					case 43: if (Kb_Key_Backslash[0]) key(Kb_Key_Backslash); break;
+					case 39: if (Kb_Key_Semicolon[0]) key(Kb_Key_Semicolon); break;
+					case 40: if (Kb_Key_Quote[0]) key(Kb_Key_Quote); break;
+					case 51: if (Kb_Key_Comma[0]) key(Kb_Key_Comma); break;
+					case 52: if (Kb_Key_Period[0]) key(Kb_Key_Period); break;
+					case 53: if (Kb_Key_Forwardslash[0]) key(Kb_Key_Forwardslash); break;
+					case 93: if (Kb_Key_Menu[0]) key(Kb_Key_Menu); break;
+					case 82: if (Kb_Key_Insert[0]) key(Kb_Key_Insert); break;
+					case 83: if (Kb_Key_Delete[0]) key(Kb_Key_Delete); break;
+					case 71: if (Kb_Key_Home[0]) key(Kb_Key_Home); break;
+					case 79: if (Kb_Key_End[0]) key(Kb_Key_End); break;
+					case 73: if (Kb_Key_PgUp[0]) key(Kb_Key_PgUp); break;
+					case 81: if (Kb_Key_PgDn[0]) key(Kb_Key_PgDn); break;
+					}
+				}
+				if (!ignoreNumPad) {
+					switch (p->scanCode) {
+					case 82: if (Kb_Key_Numpad_0[0]) key(Kb_Key_Numpad_0); break;
+					case 79: if (Kb_Key_Numpad_1[0]) key(Kb_Key_Numpad_1); break;
+					case 80: if (Kb_Key_Numpad_2[0]) key(Kb_Key_Numpad_2); break;
+					case 81: if (Kb_Key_Numpad_3[0]) key(Kb_Key_Numpad_3); break;
+					case 75: if (Kb_Key_Numpad_4[0]) key(Kb_Key_Numpad_4); break;
+					case 76: if (Kb_Key_Numpad_5[0]) key(Kb_Key_Numpad_5); break;
+					case 77: if (Kb_Key_Numpad_6[0]) key(Kb_Key_Numpad_6); break;
+					case 71: if (Kb_Key_Numpad_7[0]) key(Kb_Key_Numpad_7); break;
+					case 72: if (Kb_Key_Numpad_8[0]) key(Kb_Key_Numpad_8); break;
+					case 73: if (Kb_Key_Numpad_9[0]) key(Kb_Key_Numpad_9); break;
+					case 69: if (Kb_Key_Numlock[0]) key(Kb_Key_Numlock); break;
+					case 53: if (Kb_Key_Numpad_Divide[0]) key(Kb_Key_Numpad_Divide); break;
+					case 55: if (Kb_Key_Numpad_Multiply[0]) key(Kb_Key_Numpad_Multiply); break;
+					case 74: if (Kb_Key_Numpad_Minus[0]) key(Kb_Key_Numpad_Minus); break;
+					case 78: if (Kb_Key_Numpad_Add[0]) key(Kb_Key_Numpad_Add); break;
+					case 83: if (Kb_Key_Numpad_Period[0]) key(Kb_Key_Numpad_Period); break;
+					case 28: if (Kb_Key_Numpad_Enter[0]) key(Kb_Key_Numpad_Enter); break;
+					}
+				}
+
+
+			}
+				break;
+
+			case WM_KEYUP:
+			case WM_SYSKEYUP: {
+				if (p->scanCode == 91 || p->scanCode == 92) { isWinKeyPressed = 0; return 0; }
+
+				//Shift
+				if (p->scanCode == 42) {
+					isLshiftPressed = 0;
+					GetAsyncKeyState(VK_RSHIFT); if (GetAsyncKeyState(VK_RSHIFT))
+						rshift_lshift = 1;
+				}
+				if (p->scanCode == 54) {
+					isRshiftPressed = 0;
+					break;
+				}
+
+				//Ctrl
+				bool extended = (p->flags & LLKHF_EXTENDED) != 0;
+				if (p->scanCode == 29) {
+					if (!extended) {
+						isLctrlPressed = 0;
+						GetAsyncKeyState(VK_RCONTROL); if (GetAsyncKeyState(VK_RCONTROL))
+							repeated = 1;
+						;//cout << breaker << "\n";
+					}
+					else {
+						isRctrlPressed = 0;
+						if (repeated) break;
+						//cout << breaker << "\n";
+						if (breaker < cKeyMax) toggled = 1;
+						breaker = 0;
+						break;
+					}
+				}
+
+				if (p->scanCode == clear_strand_key) {
+					//if (GetAsyncKeyState(clear_strand_key)) {
+					if (!strand[0] || strand == L"<") return 0;
+					clear_all_keys();
+					strand = strand[0] == '<' ? L"<" : L"";
+					prints();
+					return 0;
+				}
+
+			}
+				break;
+		}
+
+		if (mvdb) { //vdb size has changed. mvdb.
+			vstrand.clear();
+			vstrand_out.clear();
+			make_vdb_table();
+
+			strand = L"<anu>";
+			scan_db();
+			repeats = repeats[0] ? L"<anu:>" + repeats.substr(5) : L"";
+			strand.clear();
+
+			mvdb = 0;
+		}
+		
+	}
+
+	if (isLctrlPressed) {
+		GetAsyncKeyState('S'); if (GetAsyncKeyState('S')) {
+			isLctrlPressed = 0; bool cs{};
+			if (FindWindowW(0, (editorSe).c_str()) == GetForegroundWindow() || FindWindowW(0, (se + editor).c_str()) == GetForegroundWindow()) {
+				//cout << "se Saved\n";
+				load_settings(); cs = 1;
+			}
+			else if (FindWindowW(0, (editorDb).c_str()) == GetForegroundWindow() || FindWindowW(0, (db + editor).c_str()) == GetForegroundWindow()) {
+				//cout << "db Saved\n";
+				vstrand.clear(); vstrand_out.clear(); make_vdb_table(); cs = 1;
+			}
+			if (cs) {
+				strand.clear(); prints();
+				kb_release(VK_RCONTROL); kb(VK_CANCEL);
+			}
+			return 0;
+		}
+
+	}
+
+	if (isRshiftPressed) {
+		GetAsyncKeyState(VK_RCONTROL); if (GetAsyncKeyState(VK_RCONTROL && RSHIFTCtrlKeyToggle)) {
+			//cout << "rshift_rctrl\n";
+			if (breaker > RSHIFTCtrlKeyToggle) return 0;
+			close_ctrl_mode = !close_ctrl_mode;
+			ccm = !ccm;
+			return 0;
+		}
+	}
+
+	if (isLshiftPressed || isRshiftPressed) return 0;
+	if (rshift_lshift) {
+		//cout << "rshift_lshift\n";
+		rshift_lshift = 0;
+		if (RSHIFTLSHIFT_Only) ++rri;
+		if (breaker > 1) strand = breaker == 2 ? L"<" : L"";
+		else if (strand[0] && strand != L"<") { key(L">"); breaker = 0; return 0; }
+		else if (!strand[0]) { strand = RSHIFTLSHIFT_Only > 1 && rri == 1 ? L"" : L"<"; }
+		else if (RSHIFTLSHIFT_Only > 1) strand = L"";
+		else strand = strand[0] == '<' ? L"" : L"<";
+		prints();
+		breaker = 0;
+		return 0;
+	}
+
+	if (isLctrlPressed || isRctrlPressed) return 0;
+	if (repeated) {
+		//cout << "repeated\n";
+		repeated = 0;
+		repeat();
+	}
+	else if (toggled) {
+		toggled = 0;
+		if (RSHIFTLSHIFT_Only && !strand[0] && !rri) return 0;
+		if (!strand[0]) strand = L"<";
+		else {
+			if (strand[0] && strand != L"<") { key(L">"); return 0; }
+			if (RSHIFTLSHIFT_Only > 1) strand = L"";
+			else strand = strand[0] == '<' ? L"" : L"<";
+		}
+		prints();
+		return 0;
+	}
+	
+	return CallNextHookEx(NULL, nCode, wParam, lParam);
+}
+
 int main() {
 	{
 		GetAsyncKeyState(VK_ESCAPE);
@@ -3066,7 +3575,25 @@ RgbScaleLayout			1.00
 
 	repeats = repeats[0] ? L"<anu:>" + repeats.substr(5) : L"";
 
-	for (;; this_thread::sleep_for(chrono::milliseconds(frequency))) {
+	if (async == 0)
+	{
+		HHOOK hook = SetWindowsHookEx(WH_KEYBOARD_LL, LowLevelKeyboardProc, NULL, 0);
+		if (!hook) {
+			num_error(L"(Use 1 instead)", L"0", L"Async");
+			return 1;
+		}
+
+		MSG msg;
+		while (GetMessage(&msg, NULL, 0, 0)) {
+			TranslateMessage(&msg);
+			DispatchMessage(&msg);
+		}
+
+		UnhookWindowsHookEx(hook);
+	}
+	else
+	{
+		for (;; this_thread::sleep_for(chrono::milliseconds(frequency))) {
 
 		if (GetAsyncKeyState(VK_BACK)) {
 			if (!strand[0]) { if (rri) rri = 0; continue; }
@@ -3279,7 +3806,7 @@ RgbScaleLayout			1.00
 				continue;
 			}
 			GetAsyncKeyState('X'); if (GetAsyncKeyState('X')) { //x + esc
-				kb(VK_BACK); return 0;
+				kb(VK_BACK); break;
 			}
 			GetAsyncKeyState('H'); if (GetAsyncKeyState('H')) { //h + esc
 				kb_release(VK_ESCAPE); kb(VK_BACK); GetAsyncKeyState(VK_BACK);
@@ -3447,6 +3974,8 @@ RgbScaleLayout			1.00
 
 			mvdb = 0;
 		}
+
+	}
 
 	}
 
