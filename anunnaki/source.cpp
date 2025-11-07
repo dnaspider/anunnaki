@@ -61,6 +61,18 @@ unsigned short LSHIFTCtrlKey = 3;
 unsigned short repeat_switch = 0;
 unsigned short debug = 0;
 unsigned short mvdb = 0; //make vstrand to
+
+unsigned short breaker{};
+bool isWinKeyPressed{};
+bool isLshiftPressed{};
+bool isRshiftPressed{};
+bool rshift_lshift{};
+bool rshift_rctrl{};
+bool isLctrlPressed{};
+bool isRctrlPressed{};
+bool repeated{};
+bool toggled{};
+
 bool async{};
 bool multi_line = 0; //<x > \n\n
 bool start_hidden = 0;
@@ -1082,6 +1094,7 @@ static bool testqqb(const wstring s) {
 }
 
 static void clear_all_keys() {
+	if (!async) return;
 	if (!ignoreAZ) for (int i = 65; i < 91; ++i) { GetAsyncKeyState(i); }
 	if (!ignore09) for (int i = 48; i < 58; ++i) { GetAsyncKeyState(i); }
 	if (Kb_Key_Right_Shift[0]) GetAsyncKeyState(VK_RSHIFT);
@@ -2859,7 +2872,7 @@ static void scan_db() {
 					if (hold_shift)
 						shift_release();
 
-					clear_key(out[c]);
+					if (!async) clear_key(out[c]);
 
 				}
 
@@ -2980,7 +2993,7 @@ static void key(wstring k) {
 	if (strand_length && strand[0] != '<' && k[0] != '>') {
 		if (strand.length() > strand_length && !utf_8)
 			strand = strand.substr(1);
-		else if(utf_8) {
+		else if (utf_8) {
 			size_t x = 0;
 			for (size_t i = 0; i < strand.length(); ++i) {
 				if (strand[i] > 127) {
@@ -2988,7 +3001,7 @@ static void key(wstring k) {
 				}
 				else ++x;
 			}
-			if(x > strand_length)
+			if (x > strand_length)
 				strand = strand[0] < 127 ? strand.substr(1) : strand.substr(2);
 		}
 	}
@@ -3000,16 +3013,6 @@ static void key(wstring k) {
 #pragma endregion
 
 #pragma comment(lib, "Winmm.lib")//<audio:>
-
-unsigned short breaker{};
-bool isWinKeyPressed{};
-bool isLshiftPressed{};
-bool isRshiftPressed{};
-bool rshift_lshift{};
-bool isLctrlPressed{};
-bool isRctrlPressed{};
-bool repeated{};
-bool toggled{};
 
 static LRESULT CALLBACK LowLevelKeyboardProc(int nCode, WPARAM wParam, LPARAM lParam) {
 	if (nCode == HC_ACTION) {
@@ -3030,12 +3033,9 @@ static LRESULT CALLBACK LowLevelKeyboardProc(int nCode, WPARAM wParam, LPARAM lP
 				//Shift
 				if (p->scanCode == 42)
 					isLshiftPressed = 1;
-				if (p->scanCode == 54) { 
-					GetAsyncKeyState(VK_LSHIFT); if (GetAsyncKeyState(VK_LSHIFT))
-						++breaker;
+				if (p->scanCode == 54)
 					isRshiftPressed = 1;
-				}
-				if (isLshiftPressed) ++breaker;
+				if (isRshiftPressed && isLshiftPressed) { ++breaker; break; }
 				if (isLshiftPressed || isRshiftPressed) break;
 
 				//VK_BACK
@@ -3052,8 +3052,8 @@ static LRESULT CALLBACK LowLevelKeyboardProc(int nCode, WPARAM wParam, LPARAM lP
 				}
 
 				//Ctrl
-				bool extended = (p->flags & LLKHF_EXTENDED) != 0;
 				if (p->scanCode == 29) {
+					bool extended = (p->flags & LLKHF_EXTENDED) != 0;
 					if (!extended)
 						isLctrlPressed = 1;
 					else
@@ -3365,48 +3365,49 @@ static LRESULT CALLBACK LowLevelKeyboardProc(int nCode, WPARAM wParam, LPARAM lP
 					}
 				}
 
-
 			}
 				break;
 
 			case WM_KEYUP:
 			case WM_SYSKEYUP: {
 				if (p->scanCode == 91 || p->scanCode == 92) { isWinKeyPressed = 0; return 0; }
+				if (isWinKeyPressed) return 0;
 
 				//Shift
 				if (p->scanCode == 42) {
 					isLshiftPressed = 0;
-					GetAsyncKeyState(VK_RSHIFT); if (GetAsyncKeyState(VK_RSHIFT))
+					GetAsyncKeyState(VK_RSHIFT); if (GetAsyncKeyState(VK_RSHIFT)) {
 						rshift_lshift = 1;
+						break;
+					}
 				}
 				if (p->scanCode == 54) {
 					isRshiftPressed = 0;
+					if (isRctrlPressed) ++breaker;
 					break;
 				}
 
 				//Ctrl
-				bool extended = (p->flags & LLKHF_EXTENDED) != 0;
 				if (p->scanCode == 29) {
+					bool extended = (p->flags & LLKHF_EXTENDED) != 0;
 					if (!extended) {
 						isLctrlPressed = 0;
 						GetAsyncKeyState(VK_RCONTROL); if (GetAsyncKeyState(VK_RCONTROL))
 							repeated = 1;
-						;//cout << breaker << "\n";
 					}
 					else {
 						isRctrlPressed = 0;
 						if (repeated) break;
-						//cout << breaker << "\n";
-						if (breaker < cKeyMax) toggled = 1;
+						if (isRshiftPressed) { if (RSHIFTCtrlKeyToggle) rshift_rctrl = 1; break; }
+						//cout << "breaker: " << breaker << "\n";
+						if (breaker < cKeyMax && !isLctrlPressed) toggled = 1;
 						breaker = 0;
 						break;
 					}
 				}
 
 				if (p->scanCode == clear_strand_key) {
-					//if (GetAsyncKeyState(clear_strand_key)) {
 					if (!strand[0] || strand == L"<") return 0;
-					clear_all_keys();
 					strand = strand[0] == '<' ? L"<" : L"";
 					prints();
 					return 0;
@@ -3431,6 +3432,7 @@ static LRESULT CALLBACK LowLevelKeyboardProc(int nCode, WPARAM wParam, LPARAM lP
 		
 	}
 
+	//lctrl+s
 	if (isLctrlPressed) {
 		GetAsyncKeyState('S'); if (GetAsyncKeyState('S')) {
 			isLctrlPressed = 0; bool cs{};
@@ -3451,14 +3453,13 @@ static LRESULT CALLBACK LowLevelKeyboardProc(int nCode, WPARAM wParam, LPARAM lP
 
 	}
 
-	if (isRshiftPressed) {
-		GetAsyncKeyState(VK_RCONTROL); if (GetAsyncKeyState(VK_RCONTROL && RSHIFTCtrlKeyToggle)) {
-			//cout << "rshift_rctrl\n";
-			if (breaker > RSHIFTCtrlKeyToggle) return 0;
-			close_ctrl_mode = !close_ctrl_mode;
-			ccm = !ccm;
-			return 0;
-		}
+	if (rshift_rctrl) {
+		//cout << "rshift_rctrl\n";
+		rshift_rctrl = 0;
+		isRshiftPressed = 0;
+		close_ctrl_mode = !close_ctrl_mode;
+		ccm = !ccm;
+		return 0;
 	}
 
 	if (isLshiftPressed || isRshiftPressed) return 0;
@@ -3480,6 +3481,7 @@ static LRESULT CALLBACK LowLevelKeyboardProc(int nCode, WPARAM wParam, LPARAM lP
 	if (repeated) {
 		//cout << "repeated\n";
 		repeated = 0;
+		breaker = 0;
 		repeat();
 	}
 	else if (toggled) {
