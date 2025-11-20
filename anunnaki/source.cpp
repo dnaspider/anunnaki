@@ -1418,7 +1418,6 @@ static void scan_db() {
 
 				//fallthrough
 				if (fallthrough_ && !vstrand.at(i).ft) fallthrough_ = 0;
-				if (fallthrough_ && !vstrand.at(i).in[0]) return;
 				if (vstrand.at(i).ft) { fallthrough_ = 1; continue; }
 
 				//backspace input depending on g and set repeat and input accordingly
@@ -2789,18 +2788,32 @@ static void key(wstring k) {
 	}
 
 	if (strand_length && strand[0] != '<' && k[0] != '>') {
-		if (strand.length() > strand_length && !utf_8)
-			strand = strand.substr(1);
-		else if (utf_8) {
-			size_t x = 0;
-			for (size_t i = 0; i < strand.length(); ++i) {
-				if (strand[i] > 127) {
-					++x; ++i;
+		if (strand.length() > strand_length) {
+			if (!utf_8)
+				strand = strand.substr(1);
+			else {
+				unsigned short bits{};
+				for (size_t i = 0; i < strand.length(); ++i) {
+					if (strand[i] & 0xc0 && strand[i] != 0x80) {
+						++bits;
+						continue;
+					}
+					if ((strand[i] & 0xc0) != 0x80) {
+						++bits;
+						++i;
+					}
 				}
-				else ++x;
+
+				if (bits > strand_length)
+					strand
+					=
+					strand[0] & 0xc0 && strand[0] != 0x80 || strand[0] < 128
+					?
+					strand.substr(1)
+					:
+					strand.substr(2)
+					;
 			}
-			if (x > strand_length)
-				strand = strand[0] < 127 ? strand.substr(1) : strand.substr(2);
 		}
 	}
 
@@ -2837,10 +2850,23 @@ static LRESULT CALLBACK LowLevelKeyboardProc(int nCode, WPARAM wParam, LPARAM lP
 				case 14: { //Backspace
 					if (!strand[0]) { if (rri) rri = 0; return 0; }
 
-					if (utf_8 && strand[strand.length() - 1] > 127)
-						strand.pop_back();
+					if (!utf_8 || strand.length() == 1) strand.pop_back(); 
+					else {
+						bool bits{};
+						for (size_t i = 0; i < strand.length(); ++i) {
+							if (strand[i] > 127 && (strand[i] & 0xc0) != 0x80) {
+								bits = 1;
+								++i;
+								continue;
+							}
+							bits = 0;
+						}
 
-					strand.pop_back();
+						if (bits)
+							strand = strand.substr(0, strand.length() - 2);
+						else
+							strand.pop_back();
+					}
 
 					prints();
 				}
@@ -2871,8 +2897,8 @@ static LRESULT CALLBACK LowLevelKeyboardProc(int nCode, WPARAM wParam, LPARAM lP
 						if (auto_bs_repeat_key)
 							kb(VK_BACK);
 						repeat();
-						return 0;
 					}
+					return 0;
 				}
 
 				//VK_ESCAPE
