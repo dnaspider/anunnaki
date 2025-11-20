@@ -2792,27 +2792,22 @@ static void key(wstring k) {
 			if (!utf_8)
 				strand = strand.substr(1);
 			else {
-				unsigned short bits{};
-				for (size_t i = 0; i < strand.length(); ++i) {
-					if (strand[i] & 0xc0 && strand[i] != 0x80) {
-						++bits;
-						continue;
-					}
-					if ((strand[i] & 0xc0) != 0x80) {
-						++bits;
-						++i;
-					}
-				}
+				if (k[0] > 32 && k[0] < 128 && strand[0] > 32 && strand[0] < 128)
+					strand = strand.substr(1);
+				else {
+					unsigned short bits{}; bool b{};
 
-				if (bits > strand_length)
-					strand
-					=
-					strand[0] & 0xc0 && strand[0] != 0x80 || strand[0] < 128
-					?
-					strand.substr(1)
-					:
-					strand.substr(2)
-					;
+					for (size_t i = 0; i < strand.length(); ++i) {
+						if ((strand[i] & 0xc0) != 0x80)
+							++bits;
+
+						if (i == 1 && bits == 1)
+							b = 1;
+					}
+
+					if (bits > strand_length)
+						strand = b ? strand.substr(2) : strand.substr(1);
+				}
 			}
 		}
 	}
@@ -2850,22 +2845,19 @@ static LRESULT CALLBACK LowLevelKeyboardProc(int nCode, WPARAM wParam, LPARAM lP
 				case 14: { //Backspace
 					if (!strand[0]) { if (rri) rri = 0; return 0; }
 
-					if (!utf_8 || strand.length() == 1) strand.pop_back(); 
+					if (!utf_8 || strand.length() == 1 || strand[strand.length() - 1] > 32 && strand[strand.length() - 1] < 128 || (strand[strand.length() - 1] & 0xc0) != 0x80)
+						strand.pop_back();
 					else {
-						bool bits{};
-						for (size_t i = 0; i < strand.length(); ++i) {
-							if (strand[i] > 127 && (strand[i] & 0xc0) != 0x80) {
-								bits = 1;
-								++i;
-								continue;
-							}
-							bits = 0;
-						}
+						unsigned short bits{};
 
-						if (bits)
-							strand = strand.substr(0, strand.length() - 2);
-						else
+						for (size_t i = 0; i < strand.length(); ++i)
+							if ((strand[i] & 0xc0) != 0x80)
+								++bits;
+
+						if (bits == strand.length())
 							strand.pop_back();
+						else
+							strand = strand.substr(0, strand.length() - 2);
 					}
 
 					prints();
