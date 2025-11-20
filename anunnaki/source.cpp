@@ -2845,19 +2845,23 @@ static LRESULT CALLBACK LowLevelKeyboardProc(int nCode, WPARAM wParam, LPARAM lP
 				case 14: { //Backspace
 					if (!strand[0]) { if (rri) rri = 0; return 0; }
 
-					if (!utf_8 || strand.length() == 1 || strand[strand.length() - 1] > 32 && strand[strand.length() - 1] < 128 || (strand[strand.length() - 1] & 0xc0) != 0x80)
+					if (!utf_8)
 						strand.pop_back();
 					else {
-						unsigned short bits{};
-
-						for (size_t i = 0; i < strand.length(); ++i)
-							if ((strand[i] & 0xc0) != 0x80)
-								++bits;
-
-						if (bits == strand.length())
+						if(strand.length() == 1 || strand[strand.length() - 1] > 32 && strand[strand.length() - 1] < 128 || (strand[strand.length() - 1] & 0xc0) != 0x80)
 							strand.pop_back();
-						else
-							strand = strand.substr(0, strand.length() - 2);
+						else {
+							unsigned short bits{};
+
+							for (size_t i = 0; i < strand.length(); ++i)
+								if ((strand[i] & 0xc0) != 0x80)
+									++bits;
+
+							if (bits == strand.length())
+								strand.pop_back();
+							else
+								strand = strand.substr(0, strand.length() - 2);
+						}
 					}
 
 					prints();
