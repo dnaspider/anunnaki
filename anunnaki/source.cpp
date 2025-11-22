@@ -1471,8 +1471,10 @@ static void scan_db() {
 					qq = out.substr(c, out.length() - c); //<test>
 					
 					if (out[c + 1] == '!') { //<!x:>
-						connect(out);
-						break;
+						if (out[c + 2] != '!' && out[c + 2] != ':') {
+							connect(out);
+							break;
+						}
 					}
 
 					if (qq.substr(0, qq.find('>')).find(':') != std::string::npos) { //<test:#>
