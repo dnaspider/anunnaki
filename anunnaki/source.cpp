@@ -908,7 +908,9 @@ static void setQxQy(wstring x) {
 		qx = x.substr(0, x.find(' '));//x <xy:# #>
 		qy = x.substr(x.find(' ') + 1, x.find('>') - x.find(' ') - 1);
 	}
-	else { qx.clear(), qy.clear(); }
+	else {
+		if (qx[0]) { qx.clear(), qy.clear(); }
+	}
 	//wcout << "x: " << x  << "\nqx: " << qx << "\nqy: " << qy << endl;
 }
 
@@ -917,7 +919,7 @@ static wstring get_out(wstring q) {
 	if (q[0] != '<') q = q.substr(0, q.length() - g.length());
 
 	for (size_t n = 0; n < vstrand.size(); ++n)
-		if (vstrand.at(n).in + vstrand.at(n).g == q + g)
+		if (vstrand.at(n).in == q && vstrand.at(n).g == g)
 			return vstrand_out.at(n).out;
 
 	return L"";
@@ -1467,6 +1469,12 @@ static void scan_db() {
 				switch (out[c]) { //extracted
 				case '<':
 					qq = out.substr(c, out.length() - c); //<test>
+					
+					if (out[c + 1] == '!') { //<!x:>
+						connect(out);
+						break;
+					}
+
 					if (qq.substr(0, qq.find('>')).find(':') != std::string::npos) { //<test:#>
 						qp = qq.substr(qq.find(':') + 1, qq.find('>') - qq.find(':') - 1); //#
 						if (qp[0]) {
@@ -3023,10 +3031,6 @@ static LRESULT CALLBACK LowLevelKeyboardProc(int nCode, WPARAM wParam, LPARAM lP
 				case 70: if (Kb_Key_ScLk[0]) key(Kb_Key_ScLk); return 0;
 				case 57: if (Kb_Key_Space[0]) key(Kb_Key_Space); return 0;
 				case 15: if (Kb_Key_Tab[0]) key(Kb_Key_Tab); return 0;
-				//case 42: if (Kb_Key_Left_Shift[0]) key(Kb_Key_Left_Shift); return 0;
-				//case 54: if (Kb_Key_Right_Shift[0]) key(Kb_Key_Right_Shift); return 0;
-				//case 29: if (Kb_Key_Left_Ctrl[0]) key(Kb_Key_Left_Ctrl); return 0;
-				//case 29: if (Kb_Key_Right_Ctrl[0]) key(Kb_Key_Right_Ctrl); return 0;
 				case 58: if (Kb_Key_Caps[0]) key(Kb_Key_Caps); return 0;
 				case 41: if (Kb_Key_Grave_Accent[0]) key(Kb_Key_Grave_Accent); return 0;
 				case 12: if (Kb_Key_Minus[0]) key(Kb_Key_Minus); return 0;
@@ -3253,7 +3257,6 @@ int main() {
 			} //root dir
 			database = c + L"\\db.txt";
 			settings = c + L"\\se.txt";
-			replacerDb = database;
 			if (CreateDirectoryW(c.c_str(), NULL)) { //L"c:\anu"
 				wstring db_ = L"";
 				wstring se_ = L"";
