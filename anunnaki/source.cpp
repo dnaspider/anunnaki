@@ -2580,6 +2580,10 @@ static void scan_db() {
 							if (qqb(L"<su")) { kb_press(L"<su", VK_F7); }//scroll up
 							else connect(out);
 							break;
+						case 'l':
+							if (qqb(L"<sl")) { kb_press(L"<sl", VK_F7); }//scroll left
+							else connect(out);
+							break;
 						default:
 							connect(out);
 						}
