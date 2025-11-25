@@ -146,7 +146,7 @@ static void make_vdb_table() {
 		if (multi_line) {
 			cells += cell0;
 			if (cell0[0] && cell0[cell0.length() - 1] == '\\') {
-				if (cell0[cell0.length() - 2] == '\\') { cells.pop_back(); continue; }
+				if (cell0.length() > 1 && cell0[cell0.length() - 2] == '\\') { cells.pop_back(); continue; }
 				cells.pop_back();
 			}
 			else continue;
