@@ -169,7 +169,7 @@ static void make_vdb_table() {
 		s_o.out.clear();
 		
 		s.in = cell.substr(0, cell.find_first_of(L" -:>"));
-		if (s.in[s.in.length() - 1] == '\\' && delimiter[0] == '\n') { //multi_line
+		if (s.in[s.in.length() - 1] == '\\' && delimiter[0] == '\n' && !cell.ends_with('\\')) { //multi_line
 			multi_line = 1;
 			s.in.pop_back();
 			cells = wstring_to_utf8(s.in) + cells.substr(s.in.length() + 1);
@@ -195,6 +195,7 @@ static void make_vdb_table() {
 	f.close();
 
 	vstrand.shrink_to_fit();
+	vstrand_out.shrink_to_fit();
 }
 
 static wstring getTime(wstring& w) {
@@ -1023,7 +1024,8 @@ i o		Use space or - for auto backspace input
 i-o
 i>o		Use > for remember input for [RepeatKey]
 
-i\>o\		Use this format to ignore tabs and new lines
+i\>o		Use this format to ignore tabs and new lines
+\
 
 <i:>o		Link
 i <i:>
