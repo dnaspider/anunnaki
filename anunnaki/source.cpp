@@ -47,6 +47,7 @@ double ic = 0; //<+> icp
 vector<Strand> vstrand{};
 vector<Strand_out> vstrand_out{};
 size_t c = 0;
+size_t found_io = 0;
 int qxcc = 0, qycc = 0;
 unsigned short out_speed = 0;
 unsigned short frequency = 160;
@@ -54,7 +55,7 @@ unsigned short strand_length = 2;
 unsigned short RSHIFTLSHIFT_Only = 0, rri = 0; //RSHIFTLSHIFT_Only 1 or 2 for L+ESC mode on; 2 for non <
 unsigned short cKey = 29, cKeyMax = 2; // Scan code for VK_RCONTROL
 unsigned short repeat_key = 69; // Scan code for VK_PAUSE;
-unsigned short PauseKey = VK_F12; //Virtual key 123
+unsigned short PauseKey = 88; //Scan code for VK_F12
 unsigned short repeat_switch = 0;
 unsigned short debug = 0;
 unsigned short mvdb = 0; //make vstrand to
@@ -81,7 +82,7 @@ bool close_ctrl_mode = 1;
 bool ManualRepeat = 1;
 bool hold_shift = 0;
 bool out_sleep = 1;
-bool stop = 0;
+bool stop = 0, pause = 0;
 bool utf_8 = 1, u8{};
 bool ccm = 0; //close_ctrl_mode toggle
 
@@ -919,15 +920,50 @@ static wstring get_out(wstring q) {
 	wstring g = q.substr(q.find_first_of(L" -:>"));
 	if (q[0] != '<') q = q.substr(0, q.length() - g.length());
 
-	for (size_t n = 0; n < vstrand.size(); ++n)
-		if (vstrand.at(n).in == q && vstrand.at(n).g == g)
-			return vstrand_out.at(n).out;
+	if (vstrand.at(found_io - 1).in == q && vstrand.at(found_io - 1).g == g) //possible <x:><x:> loop
+		return vstrand_out.at(found_io - 1).out;
+
+	size_t n{};
+
+	if (q[1] == '!') {
+		if (q.substr(2).find('!') != string::npos) { //<!#!x:>
+			wstring a = q.substr(2);
+			a = a.substr(0, a.find('!'));
+
+			if (check_if_num(a) != L"") {
+				wstring b = L"<" + q.substr(a.length() + 2);
+
+				n = stoi(a) - 1;
+
+				if (b == L"<!" + g)
+					return vstrand_out.at(n).out; //<!a!:>
+
+				if (vstrand.at(n).in == b && vstrand.at(n).g == g)
+					return vstrand_out.at(n).out; //<!a!b:>
+			}
+
+			return L"";
+		}
+
+		n = vstrand.size() > 1 ? found_io : n; //<!x:>		
+		
+		for (; n != found_io - 1; ++n) {
+			if (vstrand.at(n).in == q && vstrand.at(n).g == g)
+				return vstrand_out.at(n).out;
+			if (n == vstrand.size() - 1) n = -1;
+		}
+
+		return L"";
+	}
+	else
+		for (; n < vstrand.size(); ++n) //<x:>
+			if (vstrand.at(n).in == q && vstrand.at(n).g == g)
+				return vstrand_out.at(n).out;
 
 	return L"";
 }
 
 static wstring is_replacer(wstring& q) { // Replacer | {var:} {var-} {var>} | <r:>
-	if (!replacerDb[0]) return q;
 	if (q.find('{') != string::npos && q.find('}') != string::npos) {
 		wstring tqg = q, tq{};
 		GetAsyncKeyState(VK_ESCAPE);
@@ -976,7 +1012,7 @@ static wstring connect(wstring& w, bool bg = 0) {
 
 	if (qqs.find('>') != string::npos) {
 		wchar_t s = qqs[qqs.length() - 2];
-		if (s == ' ' || s == ':' || s == '-')
+		if (s == '!' || s == ':' || s == '-' || s == ' ')
 			con = 1;
 	}
 
@@ -984,11 +1020,10 @@ static wstring connect(wstring& w, bool bg = 0) {
 		wstring o = get_out(qqs);
 		
 		if (o[0]) {
-			if (bg)
-				return is_replacer(o);
+			if (bg) return replacerDb[0] ? is_replacer(o) : o;
 
 			w = o + qq.substr(qqs.length());
-			is_replacer(w);
+			if (replacerDb[0]) is_replacer(w);
 			c = -1;
 			if (out_speed > 0) out_sleep = 0;
 			return L"";
@@ -1007,7 +1042,7 @@ static bool testqqb(const wstring s) {
 }
 
 static void print_ctrls() {
-	cout << R"(anunnaki keyboard
+	cout << R"(Anunnaki Keyboard
 
 ?+ESC		Help
 X+ESC		Exit
@@ -1219,6 +1254,12 @@ Manual controls:
 <!!:>	Set repeat
 <!!!:>	Detach run
 
+<db> algos:
+<in:>		Scan db 0-end 
+<!in:>		Start scan at next line (full circle)
+<!#!>		Retrieve links output from line #
+<!#!in:>	<!in:> (this style input)
+
 Misc.
 Use \\\\g for > in <ifapp:>. Everywhere else \g
 Other: \, \| \&
@@ -1327,50 +1368,34 @@ static wstring getAppT() {
 	return title;
 }
 
-static void if_esc_pause(Multi_ multi_) {
+static void if_esc() {
 	GetAsyncKeyState(VK_ESCAPE); if (GetAsyncKeyState(VK_ESCAPE))
 		stop = 1;
+}
 
-	GetAsyncKeyState(PauseKey); if (GetAsyncKeyState(PauseKey)) {
+static void if_pause(Multi_ &multi_) {
+	multi_.out_ = out;
+	multi_.qq_ = qq;
+	multi_.qp_ = qp;
+	multi_.c_ = c;
 
-		multi_.out_ = out;
-		multi_.qq_ = qq;
-		multi_.qp_ = qp;
-		multi_.c_ = c;
+	while (1) {
+		if (!pause) break;
 
-		while (GetAsyncKeyState(PauseKey) != 0)
-			sleep(frequency / 3);
+		if (stop) { if (show_strand) cout << " ESC\n"; break; }
 
-		if (show_strand)
-			cout << "PAUSE\n";
+		sleep(frequency);
+	}
 
-		string q = "~PAUSE\n";
-		out_speed = 0;
-
-		while (1) {
-			GetAsyncKeyState(PauseKey); if (GetAsyncKeyState(PauseKey)) { while (GetAsyncKeyState(PauseKey) != 0) { sleep(frequency / 3); } break; }
-
-			GetAsyncKeyState(VK_ESCAPE); if (GetAsyncKeyState(VK_ESCAPE)) { q = "~ESC\n"; kb_release(VK_ESCAPE); break; }
-
-			sleep(frequency);
-		}
-
-		if (show_strand)
-			cout << q;
-
-		if (q[1] == 'E') //~ESC
-			stop = 1;
-
-		if (!stop) {
-			out = multi_.out_;
-			qq = multi_.qq_;
-			qp = multi_.qp_;
-			c = multi_.c_;
-		}
+	if (!stop) {
+		out = multi_.out_;
+		qq = multi_.qq_;
+		qp = multi_.qp_;
+		c = multi_.c_;
 	}
 }
 
-static void multi_sleep(Multi_ multi_, unsigned long ms, unsigned long n = 1) {
+static void multi_sleep(Multi_ &multi_, unsigned long ms, unsigned long n = 1) {
 	if (ms > 0) {
 		multi_.out_ = out;
 		multi_.qq_ = qq;
@@ -1379,8 +1404,9 @@ static void multi_sleep(Multi_ multi_, unsigned long ms, unsigned long n = 1) {
 
 		if (n > 1 && ms > n) {
 			for (size_t i = 0; i < n; ++i) {
-				if_esc_pause(multi_);
-				if (stop) { break; }
+				if_esc();
+				if (pause) if_pause(multi_);
+				if (stop) break;
 				this_thread::sleep_for(chrono::milliseconds(ms / n));
 			}
 		}
@@ -1396,7 +1422,7 @@ static void multi_sleep(Multi_ multi_, unsigned long ms, unsigned long n = 1) {
 
 static void scan_db() {
 
-	bool fallthrough_ = 0, found_io = 0;
+	bool fallthrough_ = 0; found_io = 0; stop = 0;
 
 	for (size_t i = 0; i < vstrand.size(); ++i)
 	{
@@ -1453,11 +1479,12 @@ static void scan_db() {
 
 			if (strand[0]) strand.clear();
 
-			found_io = 1;
+			found_io = i + 1;
 
 			for (c = 0; c < out.length(); ++c) {
 
-				if_esc_pause(multi_);
+				if_esc();
+				if (pause) if_pause(multi_);
 				if (stop) { stop = 0; break; }
 
 				if (out_speed > 0) {
@@ -1733,7 +1760,7 @@ static void scan_db() {
 							else if (qqb(L"<db>")) { 
 								for (size_t i = 0; i < vstrand.size(); ++i) {
 									wstring in_ = vstrand.at(i).in[0] && vstrand.at(i).in[vstrand.at(i).in.length() - 1] == '>' ? L"" : vstrand.at(i).g;
-									wcout << i << L": " << vstrand.at(i).in << in_ << vstrand_out.at(i).out << L"\n";
+									wcout << i + 1 << L": " << vstrand.at(i).in << in_ << vstrand_out.at(i).out << L"\n";
 								}
 								rei();
 							}
@@ -1934,14 +1961,14 @@ static void scan_db() {
 										tf_F = tf.substr(tf.find(' ') + 1);
 
 										//lint x:
-										if (tf_T.length() >= 1 && (npos_find(tf_T, ':', 1) || npos_find(tf_T, '-', 1))) {
+										if (tf_T.length() >= 1 && (npos_find(tf_T, '!', 1) || npos_find(tf_T, ':', 1) || npos_find(tf_T, '-', 1))) {
 											//link_plus_connect <x:
 											if (tf_T[0] == '<')
 												tf_T_link_plus_connect = 1;
 											else
 												tf_T_link = 1;
 										}
-										if (tf_F.length() >= 1 && (npos_find(tf_F, ':', 1) || npos_find(tf_F, '-', 1))) {
+										if (tf_F.length() >= 1 && (npos_find(tf_F, '!', 1) || npos_find(tf_F, ':', 1) || npos_find(tf_F, '-', 1))) {
 											if (tf_F[0] == '<')
 												tf_F_link_plus_connect = 1;
 											else
@@ -1960,7 +1987,7 @@ static void scan_db() {
 										tf_loop = 1;
 									else if (tf == L"<")
 										tf_F_continue = 1; //single tf_F continue
-									else if (tf.length() >= 1 && (npos_find(tf, ':', 1) || npos_find(tf, '-', 1))) {
+									else if (tf.length() >= 1 && (npos_find(tf, '!', 1) || npos_find(tf, ':', 1) || npos_find(tf, '-', 1))) {
 										if (tf[0] == '<') //single tf_F case
 											tf_F_link_plus_connect = 1;
 										else
@@ -2050,7 +2077,8 @@ static void scan_db() {
 
 								for (size_t i = 0; i < x_times; ++i)
 								{
-									if_esc_pause(multi_);
+									if_esc();
+									if (pause) if_pause(multi_);
 									if (stop) break;
 
 									if (tf_loop || tf_F_retry) ++x_times;
@@ -2683,12 +2711,20 @@ static void scan_db() {
 						connect(out);
 					} //<x>
 					break;
-				default: {
-					if ((out[c] > 32 && out[c] < 39) || (out[c] > 39 && out[c] < 44) || out[c] == 58 || (out[c] > 61 && out[c] < 91) || out[c] == 94 || out[c] == 95 || (out[c] > 122 && out[c] < 127))
-						hold_shift = true; //if !"#$%& ()*+ : > ?&AZ ^ _ {|}~
-
-					if (hold_shift)
+				default:
+				{
+					//if !"#$%& ()*+ : > ?&AZ ^ _ {|}~
+					if (out[c] == 58
+						|| out[c] < 91 && out[c] > 61
+						|| out[c] < 39 && out[c] > 32
+						|| out[c] == 95
+						|| out[c] < 44 && out[c] > 39
+						|| out[c] > 122 && out[c] < 127
+						|| out[c] == 94)
+					{
 						kb_hold(VK_LSHIFT);
+						hold_shift = 1;
+					}
 
 					kb(out[c]);
 
@@ -2722,6 +2758,7 @@ static void scan_db() {
 		if (strand[0]) strand.clear();
 		prints();
 		stop = 0;
+		found_io = 0;
 	}
 }
 
@@ -2913,6 +2950,15 @@ static LRESULT CALLBACK LowLevelKeyboardProc(int nCode, WPARAM wParam, LPARAM lP
 					return 0;
 				}
 
+				//PauseKey
+				if (p->scanCode == PauseKey) {
+					if (found_io) {
+						pause = !pause;
+						if (show_strand) cout << ' ' << (pause ? "PAUSE" : "!PAUSE") << ' ';
+						return 0;
+					}
+				}
+
 				//VK_ESCAPE
 				if (p->scanCode == 1) {
 					GetAsyncKeyState('P'); if (GetAsyncKeyState('P')) { //p + esc: <xy:>
@@ -2975,6 +3021,7 @@ static LRESULT CALLBACK LowLevelKeyboardProc(int nCode, WPARAM wParam, LPARAM lP
 						SetForegroundWindow(GetConsoleWindow());
 						return 0;
 					}
+					if (found_io) { stop = 1; return 0; }
 					if (Kb_Key_Esc[0]) { kb_release(VK_ESCAPE); key(Kb_Key_Esc); }
 					return 0;
 				}
