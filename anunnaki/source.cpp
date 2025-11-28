@@ -42,12 +42,12 @@ wstring repeats = L"";
 wstring Loop_Insert_Text = L"";
 wstring out = L"";
 string delimiter = "\n"; //°";
-double RgbScaleLayout = 1.00; //100%
-double ic = 0; //<+> icp
 vector<Strand> vstrand{};
 vector<Strand_out> vstrand_out{};
 size_t c = 0;
 size_t found_io = 0;
+double RgbScaleLayout = 1.00; //100%
+double ic = 0; //<+> icp
 int qxcc = 0, qycc = 0;
 unsigned short out_speed = 0;
 unsigned short frequency = 160;
@@ -93,10 +93,10 @@ struct Multi_ {
 		qq_ = qq,
 		qp_ = qp,
 		store_ = L"";
-	double
-		icp_ = 0;
 	size_t
 		c_ = c;
+	double
+		icp_ = 0;
 	bool
 		br_ = 0;
 };
@@ -237,6 +237,11 @@ static auto cbGet(wstring cb = L"") {
 	return cb;
 }
 
+static void show_fg() {
+	ShowWindow(GetConsoleWindow(), SW_RESTORE);
+	SetForegroundWindow(GetConsoleWindow());
+}
+
 static void num_error(wstring error_msg = L"", wstring v = L"", wstring nan = L"NAN:") {
 	wstring e = error_msg[0] ? L" " : L"";
 	e += L"\\4";
@@ -244,8 +249,7 @@ static void num_error(wstring error_msg = L"", wstring v = L"", wstring nan = L"
 	e += L" \\7{\\4\\0C\\" + v + L"\\0C\\\\7}\\n";
 	showOutsMsg(error_msg, e, L"", 1);
 	c = out.length();
-	ShowWindow(GetConsoleWindow(), SW_RESTORE);
-	SetForegroundWindow(GetConsoleWindow());
+	show_fg();
 }
 
 static wstring check_if_num(wstring& s, wstring error_msg = L"") {
@@ -387,7 +391,7 @@ static void load_settings() {
 		if (v[0] && v != L" ") v = v.substr(v.find_first_not_of(L"\t "));
 		int x = 0; for (size_t i = 0; i <= se.length(); ++i) x += se[i];
 
-		auto er = [se, v]() { showOutsMsg(L"", L"\\4Error\\7 in \\0C\\" + settings + L"\\0C\\ \\4[" + se + L" " + v + L"]\\7\\n", L"", 1); ShowWindow(GetConsoleWindow(), SW_RESTORE); SetForegroundWindow(GetConsoleWindow()); };
+		auto er = [se, v]() { showOutsMsg(L"", L"\\4Error\\7 in \\0C\\" + settings + L"\\0C\\ \\4[" + se + L" " + v + L"]\\7\\n", L"", 1); show_fg(); };
 		switch (x) {
 		case 545://Debug:
 		{ if (v == L"0" || v == L"1" || v == L"2") debug = stoi(v); else er(); } break;
@@ -902,17 +906,19 @@ static bool npos_find(wstring& w, char c, bool b = 1) {
 }
 
 static void setQxQy(wstring x) {
-	if (x.find(',') != string::npos) {
-		qx = x.substr(0, x.find(','));//x <xy:#,#>
-		qy = x.substr(x.find(',') + 1, x.find('>') - x.find(',') - 1);//y
-	}
-	else if (x.find(' ') != string::npos) {
-		qx = x.substr(0, x.find(' '));//x <xy:# #>
-		qy = x.substr(x.find(' ') + 1, x.find('>') - x.find(' ') - 1);
-	}
+	size_t q;
+
+	if (x.find(' ') != string::npos)
+		q = x.find(' ');
+	else if (x.find(',') != string::npos)
+		q = x.find(',');
 	else {
 		if (qx[0]) { qx.clear(), qy.clear(); }
+		return;
 	}
+	qx = x.substr(0, q);//x <xy:# #>
+	qy = x.substr(q + 1, 0 - q - 1);
+
 	//wcout << "x: " << x  << "\nqx: " << qx << "\nqy: " << qy << endl;
 }
 
@@ -933,7 +939,7 @@ static wstring get_out(wstring q) {
 			if (check_if_num(a) != L"") {
 				wstring b = L"<" + q.substr(a.length() + 2);
 
-				n = stoi(a) - 1;
+				n = stoi(a); n -= 1;
 
 				if (b == L"<!" + g)
 					return vstrand_out.at(n).out; //<!a!:>
@@ -945,7 +951,7 @@ static wstring get_out(wstring q) {
 			return L"";
 		}
 
-		n = vstrand.size() > 1 ? found_io : n; //<!x:>		
+		n = vstrand.size() > 1 && found_io != vstrand.size() ? found_io : n; //<!x:>		
 		
 		for (; n != found_io - 1; ++n) {
 			if (vstrand.at(n).in == q && vstrand.at(n).g == g)
@@ -1283,11 +1289,10 @@ static void toggle_visibility() {
 		kb(VK_F12); //if title "Select" x86
 		ShowWindow(GetConsoleWindow(), SW_HIDE);
 	}
-	else {
-		ShowWindow(GetConsoleWindow(), SW_RESTORE);
-		SetForegroundWindow(GetConsoleWindow());
-	}
-	sleep(150);
+	else
+		show_fg();
+
+	sleep(frequency);
 	strand.clear();
 }
 
@@ -1752,6 +1757,7 @@ static void scan_db() {
 								for (size_t i = 0; i < vstrand.size(); ++i) {
 									wstring in_ = vstrand.at(i).in[0] && vstrand.at(i).in[vstrand.at(i).in.length() - 1] == '>' ? L"" : vstrand.at(i).g;
 									wcout << i + 1 << L": " << vstrand.at(i).in << in_ << vstrand_out.at(i).out << L"\n";
+									show_fg();
 								}
 								rei();
 							}
@@ -2568,7 +2574,7 @@ static void scan_db() {
 								rei();
 								break;
 							}
-							else if (qqb(L"<se>") || qqb(L"<SE>")) { printSe(); rei(); }
+							else if (qqb(L"<se>") || qqb(L"<SE>")) { printSe(); show_fg(); rei(); }
 							else connect(out);
 							break;
 						case 'h':
@@ -3009,8 +3015,7 @@ static LRESULT CALLBACK LowLevelKeyboardProc(int nCode, WPARAM wParam, LPARAM lP
 					GetAsyncKeyState(VK_OEM_2); if (GetAsyncKeyState(VK_OEM_2)) { //? + esc
 						kb_release(VK_ESCAPE); kb(VK_BACK);
 						print_ctrls();
-						ShowWindow(GetConsoleWindow(), SW_RESTORE);
-						SetForegroundWindow(GetConsoleWindow());
+						show_fg();
 						return 0;
 					}
 					if (found_io) { stop = 1; return 0; }
