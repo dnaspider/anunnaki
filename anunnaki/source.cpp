@@ -1264,7 +1264,7 @@ Misc.
 Use \\\\g for > in <ifapp:>. Everywhere else \g
 Other: \, \| \&
 
-LCTRL+S inside
+CTRL+S inside
 [EditorDb] to rebuild [Database]
 [EditorSe] push new settings
 
@@ -1373,25 +1373,16 @@ static void if_esc() {
 		stop = 1;
 }
 
-static void if_pause(Multi_ &multi_) {
-	multi_.out_ = out;
-	multi_.qq_ = qq;
-	multi_.qp_ = qp;
-	multi_.c_ = c;
-
+static void if_pause() {
 	while (1) {
 		if (!pause) break;
 
-		if (stop) { if (show_strand) cout << " ESC\n"; break; }
+		if (GetAsyncKeyState(VK_ESCAPE))
+			stop = 1;
+
+		if (stop) { pause = 0; if (show_strand) cout << " ESC\n"; break; }
 
 		sleep(frequency);
-	}
-
-	if (!stop) {
-		out = multi_.out_;
-		qq = multi_.qq_;
-		qp = multi_.qp_;
-		c = multi_.c_;
 	}
 }
 
@@ -1405,7 +1396,7 @@ static void multi_sleep(Multi_ &multi_, unsigned long ms, unsigned long n = 1) {
 		if (n > 1 && ms > n) {
 			for (size_t i = 0; i < n; ++i) {
 				if_esc();
-				if (pause) if_pause(multi_);
+				if (pause) if_pause();
 				if (stop) break;
 				this_thread::sleep_for(chrono::milliseconds(ms / n));
 			}
@@ -1484,7 +1475,7 @@ static void scan_db() {
 			for (c = 0; c < out.length(); ++c) {
 
 				if_esc();
-				if (pause) if_pause(multi_);
+				if (pause) if_pause();
 				if (stop) { stop = 0; break; }
 
 				if (out_speed > 0) {
@@ -2078,7 +2069,7 @@ static void scan_db() {
 								for (size_t i = 0; i < x_times; ++i)
 								{
 									if_esc();
-									if (pause) if_pause(multi_);
+									if (pause) if_pause();
 									if (stop) break;
 
 									if (tf_loop || tf_F_retry) ++x_times;
@@ -2883,18 +2874,27 @@ static LRESULT CALLBACK LowLevelKeyboardProc(int nCode, WPARAM wParam, LPARAM lP
 		switch (wParam) {
 			case WM_KEYDOWN:
 			case WM_SYSKEYDOWN: {
-				if (debug == 1) printf("Virtual Key = %d, Scan Code = %d\n", p->vkCode, p->scanCode);
+				//PauseKey
+				if (p->scanCode == PauseKey) {
+					if (found_io) {
+						pause = !pause;
+						if (show_strand) cout << ' ' << (pause ? "PAUSE" : "!PAUSE") << ' ';
+						return 0;
+					}
+				}
+				
+				if (pause || isWinKeyPressed || isCkey0Pressed) return 0; //cKey 0
 
-				if (isWinKeyPressed || isCkey0Pressed) return 0; //cKey 0
+				if (debug == 1) printf("Virtual Key = %d, Scan Code = %d\n", p->vkCode, p->scanCode);
 
 				switch (p->scanCode) {
 				case 91:
 				case 92:
 					isWinKeyPressed = 1; return 0;
 				case 42: //Shift
-					isLshiftPressed = 1; break;
+					isLshiftPressed = 1; return 0;
 				case 54:
-					isRshiftPressed = 1; break;
+					isRshiftPressed = 1; return 0;
 				case 14: { //Backspace
 					if (!strand[0]) { if (rri) rri = 0; return 0; }
 
@@ -2930,15 +2930,16 @@ static LRESULT CALLBACK LowLevelKeyboardProc(int nCode, WPARAM wParam, LPARAM lP
 							++breaker;
 						}
 					}
-					else { isCkey0Pressed = 1; return 0; }
+					else
+						isCkey0Pressed = 1;
 				}
 					return 0;
 				}
 
-				if (isRshiftPressed && isLshiftPressed) break;
-				if (isLshiftPressed || isRshiftPressed) break;
-
-				if (isLctrlPressed || isRctrlPressed) break;
+				if (isRshiftPressed && isLshiftPressed
+					|| isLshiftPressed || isRshiftPressed
+					|| isLctrlPressed || isRctrlPressed)
+					break;
 
 				if (p->scanCode == repeat_key) {
 					bool extended = (p->flags & LLKHF_EXTENDED) != 0;
@@ -2948,15 +2949,6 @@ static LRESULT CALLBACK LowLevelKeyboardProc(int nCode, WPARAM wParam, LPARAM lP
 						repeat();
 					}
 					return 0;
-				}
-
-				//PauseKey
-				if (p->scanCode == PauseKey) {
-					if (found_io) {
-						pause = !pause;
-						if (show_strand) cout << ' ' << (pause ? "PAUSE" : "!PAUSE") << ' ';
-						return 0;
-					}
 				}
 
 				//VK_ESCAPE
@@ -3168,18 +3160,18 @@ static LRESULT CALLBACK LowLevelKeyboardProc(int nCode, WPARAM wParam, LPARAM lP
 			case WM_KEYUP:
 			case WM_SYSKEYUP: {
 				if (p->scanCode == 91 || p->scanCode == 92) { isWinKeyPressed = 0; return 0; }
-				if (isWinKeyPressed) return 0;
+				if (pause || isWinKeyPressed) return 0;
 
 				++breaker;
 
 				//Shift
 				if (p->scanCode == 42) {
 					isLshiftPressed = 0;
-					GetAsyncKeyState(VK_RSHIFT); if (GetAsyncKeyState(VK_RSHIFT)) {
+					GetAsyncKeyState(VK_RSHIFT); if (GetAsyncKeyState(VK_RSHIFT) && !isRctrlPressed) {
 						++clear;
 						rshift_lshift = 1;
-						break;
 					}
+					break;
 				}
 				if (p->scanCode == 54) {
 					isRshiftPressed = 0;
@@ -3198,7 +3190,7 @@ static LRESULT CALLBACK LowLevelKeyboardProc(int nCode, WPARAM wParam, LPARAM lP
 						else {
 							isRctrlPressed = 0;
 							if (repeated) break;
-							if (isRshiftPressed) { if (RSHIFTCtrlKeyToggle) rshift_rctrl = 1; break; }
+							if (isRshiftPressed) { if (RSHIFTCtrlKeyToggle && breaker <= 2) rshift_rctrl = 1; break; }
 							//cout << "breaker: " << breaker << "\n";
 							if (breaker <= cKeyMax && !isLctrlPressed && !isLshiftPressed) {
 								//toggled = 1;
@@ -3225,24 +3217,13 @@ static LRESULT CALLBACK LowLevelKeyboardProc(int nCode, WPARAM wParam, LPARAM lP
 
 		if (!isRctrlPressed) breaker = 0;
 		
-		if (mvdb) { //vdb size has changed. mvdb.
-			vstrand.clear();
-			vstrand_out.clear();
-			make_vdb_table();
-
-			strand = L"<anu>";
-			scan_db();
-			repeats = repeats[0] ? L"<anu:>" + repeats.substr(5) : L"";
-			strand.clear();
-
-			mvdb = 0;
+		if (isLshiftPressed || isRshiftPressed)
 			return 0;
-		}
 		
 		//lctrl+s
-		if (isLctrlPressed) {
+		if (isLctrlPressed || isRctrlPressed) {
 			GetAsyncKeyState('S'); if (GetAsyncKeyState('S')) {
-				isLctrlPressed = 0; bool cs{};
+				bool cs{};
 				if (FindWindowW(0, (editorSe).c_str()) == GetForegroundWindow() || FindWindowW(0, (se + editor).c_str()) == GetForegroundWindow()) {
 					//cout << "se Saved\n";
 					load_settings(); cs = 1;
@@ -3253,10 +3234,26 @@ static LRESULT CALLBACK LowLevelKeyboardProc(int nCode, WPARAM wParam, LPARAM lP
 				}
 				if (cs) {
 					strand.clear(); prints();
-					kb_release(VK_RCONTROL); kb(VK_CANCEL);
 				}
 				return 0;
 			}
+		}
+		
+		if (isLctrlPressed || isRctrlPressed)
+			return 0;
+
+		if (mvdb) { //vdb size has changed. mvdb.
+			vstrand.clear();
+			vstrand_out.clear();
+			make_vdb_table();
+
+			strand = L"<anu>";
+			scan_db();
+			repeats = repeats[0] ? repeats.substr(5) : L"";
+			strand.clear();
+
+			mvdb = 0;
+			return 0;
 		}
 
 		if (rshift_rctrl) {
@@ -3268,7 +3265,6 @@ static LRESULT CALLBACK LowLevelKeyboardProc(int nCode, WPARAM wParam, LPARAM lP
 			return 0;
 		}
 
-		if (isLshiftPressed || isRshiftPressed) return 0;
 		if (rshift_lshift) {
 			//cout << "rshift_lshift\n";
 			rshift_lshift = 0;
@@ -3283,7 +3279,6 @@ static LRESULT CALLBACK LowLevelKeyboardProc(int nCode, WPARAM wParam, LPARAM lP
 			return 0;
 		}
 
-		if (isLctrlPressed || isRctrlPressed) return 0;
 		if (repeated) {
 			//cout << "repeated\n";
 			repeated = 0;
@@ -3322,7 +3317,7 @@ int main() {
 					if (GetAsyncKeyState('1') || GetAsyncKeyState(VK_NUMPAD1)) { num = 1; break; }
 				}
 				if (num) {
-					db_ = LR"(<anu><:\04\                                          __   .__  \n_____    ____  __ __  ____   ____ _____  |  | _|__| \n\__  \  /    \|  |  \/    \ /    \\__   \ |  |/ /  | \n / __ \|   |  \  |  /   |  \   |  \/ __ \|    <|  | \n(____  /___|  /____/|___|  /___|  (____  /__|_ \__| \n     \/     \/           \/     \/     \/     \/    \7><:\nWELCOME! [\T] [\012\?+ESC\7]\n><db >
+					db_ = LR"(<anu><esc><:\04\                                          __   .__  \n_____    ____  __ __  ____   ____ _____  |  | _|__| \n\__  \  /    \|  |  \/    \ /    \\__   \ |  |/ /  | \n / __ \|   |  \  |  /   |  \   |  \/ __ \|    <|  | \n(____  /___|  /____/|___|  /___|  (____  /__|_ \__| \n     \/     \/           \/     \/     \/     \/    \7><:\nWELCOME! [\T] [\012\?+ESC\7]\n><db >
 
 db
 <db ><wr:>c:\anu\db.txt<enter>
@@ -3347,7 +3342,7 @@ RgbScaleLayout			1.00
 
 	load_settings();
 
-	if (start_hidden)ShowWindow(GetConsoleWindow(), SW_HIDE);
+	if (start_hidden) ShowWindow(GetConsoleWindow(), SW_HIDE);
 
 	SetConsoleOutputCP(CP_UTF8);
 
@@ -3360,7 +3355,7 @@ RgbScaleLayout			1.00
 
 	scan_db();
 	
-	repeats = repeats[0] ? L"<anu:>" + repeats.substr(5) : L"";
+	repeats = repeats[0] ? repeats.substr(5) : L"";
 
 	HHOOK hook = SetWindowsHookEx(WH_KEYBOARD_LL, LowLevelKeyboardProc, NULL, 0);
 	//if (!hook) { cout << "Load hook failed. Try v1.0.0.1"; return 1; }
