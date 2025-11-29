@@ -1469,13 +1469,13 @@ static void scan_db() {
 
 			//run output
 
+			found_io = i + 1;
+
 			if (replacerDb[0]) is_replacer(out); //<r:>
 
 			Multi_ multi_;
 
 			if (strand[0]) strand.clear();
-
-			found_io = i + 1;
 
 			for (c = 0; c < out.length(); ++c) {
 
