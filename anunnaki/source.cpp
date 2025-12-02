@@ -961,10 +961,12 @@ static wstring get_out(wstring q) {
 
 		return L"";
 	}
-	else
+	else {
+		if (found_io - 1 == 0) ++n;
 		for (; n < vstrand.size(); ++n) //<x:>
 			if (vstrand.at(n).in == q && vstrand.at(n).g == g)
 				return vstrand_out.at(n).out;
+	}
 
 	return L"";
 }
