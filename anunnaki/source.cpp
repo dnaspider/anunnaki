@@ -132,7 +132,7 @@ static std::string wstring_to_utf8(const std::wstring& wstr) {
 static void make_vdb_table() {
 	ifstream f(database);
 
-	if (!f) { showOutsMsg(L"", L"\\0C\\" + database + L"\\0C\\\\4 not found!\\7\\n", L"", 1); return; }
+	if (!f) { f.close(); showOutsMsg(L"", L"\\0C\\" + database + L"\\0C\\\\4 not found!\\7\\n", L"", 1); return; }
 
 	f.imbue(locale("en_us.utf8"));
 
@@ -373,13 +373,15 @@ static void call_utf8() {
 
 static void load_settings() {
 	ifstream f(settings);
-	f.imbue(locale("en_US.utf8"));
 
 	if (!f) {
+		f.close();
 		showOutsMsg(L"", L"\\n\\4Settings \\7\\0C\\" + settings + L"\\0C\\\\4 not found!\\7\\n", L"", 1);
 		if (!settings[0]) { cout << "Create c:\\anu\\se.txt manually\n"; }
 		return;
 	}
+
+	f.imbue(locale("en_US.utf8"));
 
 	wstring cell; string cells; while (getline(f, cells)) {
 		if (!cells[0] || cells[0] == ' ') continue;
@@ -670,7 +672,7 @@ static void load_settings() {
 
 static void printSe() {
 	if (qq[1] == 's') load_settings();
-	wcout << settings << '\n'; ifstream f(settings); if (f.fail()) { showOutsMsg(L"Copy to ", settings, L"\n", 0); }
+	wcout << settings << '\n'; ifstream f(settings); if (f.fail()) { f.close(); showOutsMsg(L"Copy to ", settings, L"\n", 0); } f.close();
 	cout << "StartHidden: " << start_hidden << '\n';
 	wcout << "Settings: " << settings << '\n';
 	wcout << "Database: " << database << '\n';
@@ -1746,7 +1748,7 @@ static void scan_db() {
 							if (testqqb(L"<DB:") || testqqb(L"<db:")) {//.h Database:
 								if (qq[1] == 'D') showOutsMsg(L"", qp, L"", 0);
 								qp = regex_replace(qp, wregex(L"/"), L"\\");
-								wifstream f(qp); if (!f) { showOutsMsg(L"", L"\\n\\4Database \\7\\0C\\" + qp + L"\\0C\\\\4 not found!\\7\\n", L"", 1); return; }
+								wifstream f(qp); if (!f) { f.close(); showOutsMsg(L"", L"\\n\\4Database \\7\\0C\\" + qp + L"\\0C\\\\4 not found!\\7\\n", L"", 1); return; } f.close();
 								rei();
 								//append db
 								wstring t = database;
@@ -2566,7 +2568,7 @@ static void scan_db() {
 							if (testqqb(L"<SE:") || testqqb(L"<se:")) {//.h Switch Settings: file
 								if (qq[1] == 'S') showOutsMsg(L"", qp, L"", 0);
 								qp = regex_replace(qp, wregex(L"/"), L"\\");
-								wifstream f(qp); if (!f) { showOutsMsg(L"", L"\\n\\4Settings \\7\\0C\\" + qp + L"\\0C\\\\4 not found!\\7", L"", 1); return; }
+								wifstream f(qp); if (!f) { f.close(); showOutsMsg(L"", L"\\n\\4Settings \\7\\0C\\" + qp + L"\\0C\\\\4 not found!\\7", L"", 1); return; } f.close();
 								settings = qp;
 								se = settings.substr(settings.find_last_of('\\') + 1) + L" - ";
 								wstring db_ = database;
