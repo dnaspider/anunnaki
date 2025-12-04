@@ -672,7 +672,7 @@ static void load_settings() {
 
 static void printSe() {
 	if (qq[1] == 's') load_settings();
-	wcout << settings << '\n'; ifstream f(settings); if (f.fail()) { f.close(); showOutsMsg(L"Copy to ", settings, L"\n", 0); } f.close();
+	wcout << settings << '\n'; ifstream f(settings); if (f.fail()) { showOutsMsg(L"Copy to ", settings, L"\n", 0); } f.close();
 	cout << "StartHidden: " << start_hidden << '\n';
 	wcout << "Settings: " << settings << '\n';
 	wcout << "Database: " << database << '\n';
@@ -938,10 +938,29 @@ static wstring get_out(wstring q) {
 			wstring a = q.substr(2);
 			a = a.substr(0, a.find('!'));
 
-			if (check_if_num(a) != L"") {
+			if (a == L"^" || check_if_num(a) != L"") {
 				wstring b = L"<" + q.substr(a.length() + 2);
 
-				n = stoi(a); n -= 1;
+				if (a[0] == '^') {
+					if (vstrand.size() == 1) return L"";
+					if (found_io == 1) n = vstrand.size() - 1;
+					else
+						n = found_io == vstrand.size() ? vstrand.size() - 2 : found_io - 2;
+
+					if (b == L"<!" + g)
+						return vstrand_out.at(n).out; //<!^!>
+
+					for (; n != found_io - 1; --n) { //<!^!b:>
+						if (vstrand.at(n).in == b && vstrand.at(n).g == g)
+							return vstrand_out.at(n).out;
+						if (n == 0) n = vstrand.size();
+					}
+
+					return L"";
+				}
+				else n = stoi(a);
+
+				if (n < 1 || n > vstrand_out.size()) return L"";
 
 				if (b == L"<!" + g)
 					return vstrand_out.at(n).out; //<!a!:>
@@ -963,12 +982,10 @@ static wstring get_out(wstring q) {
 
 		return L"";
 	}
-	else {
-		if (found_io - 1 == 0) ++n;
+	else
 		for (; n < vstrand.size(); ++n) //<x:>
 			if (vstrand.at(n).in == q && vstrand.at(n).g == g)
 				return vstrand_out.at(n).out;
-	}
 
 	return L"";
 }
@@ -1265,10 +1282,12 @@ Manual controls:
 <!!!:>	Detach run
 
 <db> algos:
-<in:>		Scan db 0-end 
+<in:>		Scan db 0-end
 <!in:>		Start scan at next line (full circle)
-<!#!>		Retrieve links output from line #
-<!#!in:>	<!in:> (this style input)
+<!#!>		From line #
+<!#!in:>	With sanity check
+<!^!>		From line above
+<!^!in:>	Upwards scan
 
 Misc.
 Use \\\\g for > in <ifapp:>. Everywhere else \g
