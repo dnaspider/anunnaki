@@ -960,7 +960,9 @@ static wstring get_out(wstring q) {
 				}
 				else n = stoi(a);
 
-				if (n < 1 || n > vstrand_out.size()) return L"";
+				if (n <= 0 || n > vstrand_out.size()) return L"";
+
+				n -= 1;
 
 				if (b == L"<!" + g)
 					return vstrand_out.at(n).out; //<!a!:>
