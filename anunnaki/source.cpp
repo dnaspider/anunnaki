@@ -910,15 +910,15 @@ static bool npos_find(wstring& w, char c, bool b = 1) {
 static void setQxQy(wstring x) {
 	size_t q;
 
-	if (x.find(' ') != string::npos)
+	if (x.find(' ') != string::npos) //<xy:# #>
 		q = x.find(' ');
-	else if (x.find(',') != string::npos)
+	else if (x.find(',') != string::npos) //<xy:#,#>
 		q = x.find(',');
 	else {
 		if (qx[0]) { qx.clear(), qy.clear(); }
 		return;
 	}
-	qx = x.substr(0, q);//x <xy:# #>
+	qx = x.substr(0, q);
 	qy = x.substr(q + 1, 0 - q - 1);
 
 	//wcout << "x: " << x  << "\nqx: " << qx << "\nqy: " << qy << endl;
@@ -933,63 +933,67 @@ static wstring get_out(wstring q) {
 
 	size_t n{};
 
-	if (q[1] == '!') {
-		if (q.substr(2).find('!') != string::npos) { //<!#!x:>
+	wstring b;
+	
+	switch (q[1]) {
+	case '!': { //downwards scan or go to line #; <!x:>
+		if (q.substr(2).find('!') != string::npos) { //<!a!b:>
 			wstring a = q.substr(2);
 			a = a.substr(0, a.find('!'));
 
-			if (a == L"^" || check_if_num(a) != L"") {
-				wstring b = L"<" + q.substr(a.length() + 2);
-
-				if (a[0] == '^') {
-					if (vstrand.size() == 1) return L"";
-					if (found_io == 1) n = vstrand.size() - 1;
-					else
-						n = found_io == vstrand.size() ? vstrand.size() - 2 : found_io - 2;
-
-					if (b == L"<!" + g)
-						return vstrand_out.at(n).out; //<!^!>
-
-					for (; n != found_io - 1; --n) { //<!^!b:>
-						if (vstrand.at(n).in == b && vstrand.at(n).g == g)
-							return vstrand_out.at(n).out;
-						if (n == 0) n = vstrand.size();
-					}
-
-					return L"";
-				}
-				else n = stoi(a);
+			if (check_if_num(a) != L"") {
+				n = stoi(a);
 
 				if (n <= 0 || n > vstrand_out.size()) return L"";
 
 				n -= 1;
 
-				if (b == L"<!" + g)
-					return vstrand_out.at(n).out; //<!a!:>
+				b = L"<" + q.substr(a.length() + 3);
+
+				if (b == L"<" + g)
+					return vstrand_out.at(n).out; // go to line #; <!#!>
 
 				if (vstrand.at(n).in == b && vstrand.at(n).g == g)
-					return vstrand_out.at(n).out; //<!a!b:>
+					return vstrand_out.at(n).out; //<!#!x:>
 			}
 
 			return L"";
 		}
 
-		n = vstrand.size() > 1 && found_io != vstrand.size() ? found_io : n; //<!x:>		
-		
-		for (; n != found_io - 1; ++n) {
-			if (vstrand.at(n).in == q && vstrand.at(n).g == g)
+		b = L"<" + q.substr(2);
+
+		n = vstrand.size() > 1 && found_io != vstrand.size() ? found_io : n;		
+
+		for (; n != found_io - 1; ++n) { //<!x:>
+			if (vstrand.at(n).in == b && vstrand.at(n).g == g)
 				return vstrand_out.at(n).out;
 			if (n == vstrand.size() - 1) n = -1;
 		}
-
-		return L"";
 	}
-	else
-		for (; n < vstrand.size(); ++n) //<x:>
+		break;
+	case '^': { //upwards scan; <^x:>
+		if (vstrand.size() == 1) return L"";
+		if (found_io == 1) n = vstrand.size() - 1;
+		else
+			n = found_io == vstrand.size() ? vstrand.size() - 2 : found_io - 2;
+
+		b = L"<" + q.substr(2);
+
+		for (; n != found_io - 1; --n) { //<^b:>
+			if (vstrand.at(n).in == b && vstrand.at(n).g == g)
+				return vstrand_out.at(n).out;
+			if (n == 0) n = vstrand.size();
+		}
+	}
+		break;
+	default: //regular top to bottom scan; <x:>
+		for (; n < vstrand.size(); ++n)
 			if (vstrand.at(n).in == q && vstrand.at(n).g == g)
 				return vstrand_out.at(n).out;
+	}
 
 	return L"";
+
 }
 
 static wstring is_replacer(wstring& q) { // Replacer | {var:} {var-} {var>} | <r:>
@@ -1041,7 +1045,7 @@ static wstring connect(wstring& w, bool bg = 0) {
 
 	if (qqs.find('>') != string::npos) {
 		wchar_t s = qqs[qqs.length() - 2];
-		if (s == '!' || s == ':' || s == '-' || s == ' ')
+		if (s == '!' || s == '^' || s == ':' || s == '-' || s == ' ')
 			con = 1;
 	}
 
@@ -1284,12 +1288,11 @@ Manual controls:
 <!!!:>	Detach run
 
 <db> algos:
-<in:>		Scan db 0-end
-<!in:>		Start scan at next line (full circle)
-<!#!>		From line #
+<in:>		Scan db from top to bottom
+<!in:>		Strat scan at next line for <in:> (full circle). Use !
+<^in:>		Upwards scan. Use ^
+<!#!>		Get output from line #
 <!#!in:>	With sanity check
-<!^!>		From line above
-<!^!in:>	Upwards scan
 
 Misc.
 Use \\\\g for > in <ifapp:>. Everywhere else \g
@@ -1520,8 +1523,8 @@ static void scan_db() {
 				case '<':
 					qq = out.substr(c, out.length() - c); //<test>
 					
-					if (out[c + 1] == '!') { //<!x:>
-						if (out[c + 2] != '!' && out[c + 2] != ':') {
+					if (out[c + 1] == '!' || out[c + 1] == '^') { //<!x:> or <^x:>
+						if (out[c + 2] != '!' && out[c + 2] != ':' || out[c + 1] == '^') {
 							connect(out);
 							break;
 						}
@@ -1983,14 +1986,14 @@ static void scan_db() {
 										tf_F = tf.substr(tf.find(' ') + 1);
 
 										//lint x:
-										if (tf_T.length() >= 1 && (npos_find(tf_T, '!', 1) || npos_find(tf_T, ':', 1) || npos_find(tf_T, '-', 1))) {
+										if (tf_T.length() >= 1 && (npos_find(tf_T, '!', 1) || npos_find(tf_T, '^', 1) || npos_find(tf_T, ':', 1) || npos_find(tf_T, '-', 1))) {
 											//link_plus_connect <x:
 											if (tf_T[0] == '<')
 												tf_T_link_plus_connect = 1;
 											else
 												tf_T_link = 1;
 										}
-										if (tf_F.length() >= 1 && (npos_find(tf_F, '!', 1) || npos_find(tf_F, ':', 1) || npos_find(tf_F, '-', 1))) {
+										if (tf_F.length() >= 1 && (npos_find(tf_F, '!', 1) || npos_find(tf_F, '^', 1) || npos_find(tf_F, ':', 1) || npos_find(tf_F, '-', 1))) {
 											if (tf_F[0] == '<')
 												tf_F_link_plus_connect = 1;
 											else
@@ -2009,7 +2012,7 @@ static void scan_db() {
 										tf_loop = 1;
 									else if (tf == L"<")
 										tf_F_continue = 1; //single tf_F continue
-									else if (tf.length() >= 1 && (npos_find(tf, '!', 1) || npos_find(tf, ':', 1) || npos_find(tf, '-', 1))) {
+									else if (tf.length() >= 1 && (npos_find(tf, '!', 1) || npos_find(tf, '^', 1) || npos_find(tf, ':', 1) || npos_find(tf, '-', 1))) {
 										if (tf[0] == '<') //single tf_F case
 											tf_F_link_plus_connect = 1;
 										else
