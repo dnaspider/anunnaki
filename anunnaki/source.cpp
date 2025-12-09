@@ -71,6 +71,7 @@ bool isRctrlPressed{};
 bool rshift_lshift{};
 bool rshift_rctrl{};
 bool repeated{};
+bool ctrl_s{};
 
 bool RSHIFTCtrlKeyToggle = 1;
 bool multi_line = 0; //<x > \n\n
@@ -3196,23 +3197,22 @@ static LRESULT CALLBACK LowLevelKeyboardProc(int nCode, WPARAM wParam, LPARAM lP
 				if (pause || isWinKeyPressed) return 0;
 
 				++breaker;
-
-				//Shift
-				if (p->scanCode == 42) {
+				
+				switch (p->scanCode) {
+				case 31: //S
+					if (isLctrlPressed || isRctrlPressed) ctrl_s = 1;
+					break;
+				case 42: //Lshift
 					isLshiftPressed = 0;
 					GetAsyncKeyState(VK_RSHIFT); if (GetAsyncKeyState(VK_RSHIFT) && !isRctrlPressed) {
 						++clear;
 						rshift_lshift = 1;
 					}
 					break;
-				}
-				if (p->scanCode == 54) {
+				case 54: //Rshift
 					isRshiftPressed = 0;
 					break;
-				}
-
-				//Ctrl
-				if (p->scanCode == 29) {
+				case 29: //Ctrl
 					if (cKey == 29) {
 						bool extended = (p->flags & LLKHF_EXTENDED) != 0;
 						if (!extended) {
@@ -3244,6 +3244,7 @@ static LRESULT CALLBACK LowLevelKeyboardProc(int nCode, WPARAM wParam, LPARAM lP
 					}
 					else { isCkey0Pressed = 0; return 0; }
 				}
+
 			}
 				break;
 		}
@@ -3254,22 +3255,25 @@ static LRESULT CALLBACK LowLevelKeyboardProc(int nCode, WPARAM wParam, LPARAM lP
 			return 0;
 		
 		//lctrl+s
-		if (isLctrlPressed || isRctrlPressed) {
-			GetAsyncKeyState('S'); if (GetAsyncKeyState('S')) {
-				bool cs{};
-				if (FindWindowW(0, (editorSe).c_str()) == GetForegroundWindow() || FindWindowW(0, (se + editor).c_str()) == GetForegroundWindow()) {
-					//cout << "se Saved\n";
-					load_settings(); cs = 1;
-				}
-				else if (FindWindowW(0, (editorDb).c_str()) == GetForegroundWindow() || FindWindowW(0, (db + editor).c_str()) == GetForegroundWindow()) {
-					//cout << "db Saved\n";
-					vstrand.clear(); vstrand_out.clear(); make_vdb_table(); cs = 1;
-				}
-				if (cs) {
-					strand.clear(); prints();
-				}
-				return 0;
+		if (ctrl_s) {
+			ctrl_s = 0;
+			isLctrlPressed = 0;
+			isRctrlPressed = 0;
+			HWND h = GetForegroundWindow();
+			bool cs{};
+
+			if (FindWindowW(0, (editorDb).c_str()) == h || FindWindowW(0, (db + editor).c_str()) == h) {
+				//cout << "db Saved\n";
+				vstrand.clear(); vstrand_out.clear(); make_vdb_table(); cs = 1;
 			}
+			else if (FindWindowW(0, (editorSe).c_str()) == h || FindWindowW(0, (se + editor).c_str()) == h) {
+				//cout << "se Saved\n";
+				load_settings(); cs = 1;
+			}
+			if (cs) {
+				strand.clear(); prints();
+			}
+			return 0;
 		}
 		
 		if (isLctrlPressed || isRctrlPressed)
