@@ -1112,7 +1112,7 @@ Hold RSHIFT, Press LSHIFT three times
 
 Settings
 <se>		Reload; print to console. Use SE to only print
-<se:>		Load other (c:\anu\se1.txt)
+<se:>		Load other (<se:c:\anu\se1.txt>)
 
 Database
 <db>		Print
@@ -3200,7 +3200,7 @@ static LRESULT CALLBACK LowLevelKeyboardProc(int nCode, WPARAM wParam, LPARAM lP
 				
 				switch (p->scanCode) {
 				case 31: //S
-					if (isLctrlPressed || isRctrlPressed) ctrl_s = 1;
+					if (isLctrlPressed || isRctrlPressed || isCkey0Pressed) ctrl_s = 1;
 					break;
 				case 42: //Lshift
 					isLshiftPressed = 0;
@@ -3259,6 +3259,7 @@ static LRESULT CALLBACK LowLevelKeyboardProc(int nCode, WPARAM wParam, LPARAM lP
 			ctrl_s = 0;
 			isLctrlPressed = 0;
 			isRctrlPressed = 0;
+			isCkey0Pressed = 0;
 			HWND h = GetForegroundWindow();
 			bool cs{};
 
