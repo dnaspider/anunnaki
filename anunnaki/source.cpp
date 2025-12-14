@@ -171,7 +171,7 @@ static void make_vdb_table() {
 		s_o.out.clear();
 		
 		s.in = cell.substr(0, cell.find_first_of(L" -:>"));
-		if (s.in[s.in.length() - 1] == '\\' && delimiter[0] == '\n' && !cell.ends_with('\\')) { //multi_line
+		if (s.in[s.in.length() - 1] == '\\' && delimiter[0] == '\n') { //multi_line
 			multi_line = 1;
 			s.in.pop_back();
 			cells = wstring_to_utf8(s.in) + cells.substr(s.in.length() + 1);
@@ -279,9 +279,10 @@ static void kb(wchar_t b) { //out char
 static void showOutsMsg(wstring s, wstring w, wstring s1 = L"", bool make_color = 1) {
 	HANDLE hC = GetStdHandle(STD_OUTPUT_HANDLE);
 	size_t x = 0; bool t = 0;
-	auto write = [&x, &t](wstring w) {
+	auto write = [&x, &t, &make_color](wstring w) {
 		wcout << w;
-		++x; t = 1;
+		if (make_color) ++x;
+		t = 1;
 		};
 	auto color = [&x, &t, &w, &hC, &make_color](WORD n) {
 		if (make_color) SetConsoleTextAttribute(hC, n);
@@ -332,8 +333,8 @@ static void showOutsMsg(wstring s, wstring w, wstring s1 = L"", bool make_color 
 			case'9':
 				color(9); break;
 			case '\\':
-			{ if (make_color) write(L"\\"); }
-			break;
+				write(L"\\");
+				break;
 			case '\'':
 				if (make_color) {
 					x = w.length() - 1;
@@ -347,14 +348,16 @@ static void showOutsMsg(wstring s, wstring w, wstring s1 = L"", bool make_color 
 			{ if (make_color) write(utf8_to_wstring(delimiter)); }
 			break;
 			case 'n':
-			{ if (make_color) write(L"\n"); }
-			break;
+				write(L"\n");
+				if (!make_color) ++x;
+				break;
 			case 'T':
 			{ if (make_color) { wstring w{}; getTime(w); write(w); } }
 			break;
 			case 't':
-			{ if (make_color) write(L"\t"); }
-			break;
+				write(L"\t");
+				if (!make_color) ++x;
+				break;
 			case 'g':
 			{ if (make_color) write(L">"); }
 			break;
@@ -1479,7 +1482,13 @@ static void scan_db() {
 				switch (vstrand.at(i).g[0])
 				{
 				case '>':
-					repeats = vstrand.at(i).in + vstrand_out.at(i).out;
+					if (vstrand.at(i).in[0] == '<') {
+						repeats = vstrand.at(i).in.substr(1);
+						repeats.pop_back();
+					}
+					else
+						repeats = vstrand.at(i).in;
+					repeats += vstrand_out.at(i).out;
 					out = vstrand_out.at(i).out;
 					break;
 					//case ' ':
@@ -3355,7 +3364,15 @@ int main() {
 					if (GetAsyncKeyState('1') || GetAsyncKeyState(VK_NUMPAD1)) { num = 1; break; }
 				}
 				if (num) {
-					db_ = LR"(<anu><esc><:\04\                                          __   .__  \n_____    ____  __ __  ____   ____ _____  |  | _|__| \n\__  \  /    \|  |  \/    \ /    \\__   \ |  |/ /  | \n / __ \|   |  \  |  /   |  \   |  \/ __ \|    <|  | \n(____  /___|  /____/|___|  /___|  (____  /__|_ \__| \n     \/     \/           \/     \/     \/     \/    \7><:\nWELCOME! [\T] [\012\?+ESC\7]\n><db >
+					db_ = LR"(<anu\><esc><:\4\0C\
+                                          __   .__  \n
+_____    ____  __ __  ____   ____ _____  |  | _|__|\0C\\7.5\4\0C\\n
+\__  \  /    \|  |  \/    \ /    \\__  \ |  |/ /  | \n
+ / __ \|   |  \  |  /   |  \   |  \/ __ \|    <|  | \n
+(____  /___|  /____/|___|  /___|  (____  /__|_ \__| \n
+     \/     \/           \/     \/     \/     \/>
+<:\n\7WELCOME! [\T] [\012\?+ESC\7]\n><db >
+\
 
 db
 <db ><wr:>c:\anu\db.txt<enter>
