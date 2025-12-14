@@ -3296,7 +3296,7 @@ static LRESULT CALLBACK LowLevelKeyboardProc(int nCode, WPARAM wParam, LPARAM lP
 
 			strand = L"<anu>";
 			scan_db();
-			repeats = repeats[0] ? repeats.substr(5) : L"";
+			repeats = repeats[0] ? repeats.substr(3) : L"";
 			strand.clear();
 
 			mvdb = 0;
@@ -3410,7 +3410,7 @@ RgbScaleLayout			1.00
 
 	scan_db();
 	
-	repeats = repeats[0] ? repeats.substr(5) : L"";
+	repeats = repeats[0] ? repeats.substr(3) : L"";
 
 	HHOOK hook = SetWindowsHookEx(WH_KEYBOARD_LL, LowLevelKeyboardProc, NULL, 0);
 	//if (!hook) { cout << "Load hook failed. Try v1.0.0.1"; return 1; }
