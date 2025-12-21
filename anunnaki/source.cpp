@@ -1740,7 +1740,6 @@ static void scan_db() {
 						else connect(out);
 						break;
 					case'c':
-					case'C':
 						switch (qq[2]) {
 						case 'l':
 							if (qqb(L"<cl>")) { wstring l = cbGet(); l = to_wstring(l.length()); cbSet(l); rei(); }
@@ -1759,7 +1758,6 @@ static void scan_db() {
 								}
 								else if (qq[3] == ':') {
 									if (npos_find(qp, '\\', 1)) qp = regex_replace(qp, wregex(L"\\\\\\\\\\\\\\\\g"), L">"); // \\\\g
-									//replace_q(qp, L">", L"g");
 									cbSet(qp);
 								}
 								rei();
@@ -1780,7 +1778,7 @@ static void scan_db() {
 						case 'B':
 						case 'b':
 							if (testqqb(L"<DB:") || testqqb(L"<db:")) {//.h Database:
-								if (qq[1] == 'D') showOutsMsg(L"", qp, L"", 0);
+								if (qq[1] == 'D') showOutsMsg(L"", qp, L"\n", 0);
 								qp = regex_replace(qp, wregex(L"/"), L"\\");
 								wifstream f(qp); if (!f) { f.close(); showOutsMsg(L"", L"\\n\\4Database \\7\\0C\\" + qp + L"\\0C\\\\4 not found!\\7\\n", L"", 1); return; } f.close();
 								rei();
@@ -2600,9 +2598,9 @@ static void scan_db() {
 						case 'E':
 						case 'e':
 							if (testqqb(L"<SE:") || testqqb(L"<se:")) {//.h Switch Settings: file
-								if (qq[1] == 'S') showOutsMsg(L"", qp, L"", 0);
+								if (qq[1] == 'S') showOutsMsg(L"", qp, L"\n", 0);
 								qp = regex_replace(qp, wregex(L"/"), L"\\");
-								wifstream f(qp); if (!f) { f.close(); showOutsMsg(L"", L"\\n\\4Settings \\7\\0C\\" + qp + L"\\0C\\\\4 not found!\\7", L"", 1); return; } f.close();
+								wifstream f(qp); if (!f) { f.close(); showOutsMsg(L"", L"\\n\\4Settings \\7\\0C\\" + qp + L"\\0C\\\\4 not found!\\7\\n", L"", 1); return; } f.close();
 								settings = qp;
 								se = settings.substr(settings.find_last_of('\\') + 1) + L" - ";
 								wstring db_ = database;
