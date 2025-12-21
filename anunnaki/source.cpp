@@ -2795,6 +2795,19 @@ static void scan_db() {
 		stop = 0;
 		found_io = 0;
 	}
+	
+	if (mvdb) { //<se:>
+		mvdb = 0;
+
+		vstrand.clear();
+		vstrand_out.clear();
+		make_vdb_table();
+
+		strand = L"<anu>";
+		scan_db();
+		repeats = repeats[0] ? repeats.substr(3) : L"";
+		strand.clear();
+	}
 }
 
 static void run(wstring ai) {
@@ -3288,20 +3301,6 @@ static LRESULT CALLBACK LowLevelKeyboardProc(int nCode, WPARAM wParam, LPARAM lP
 		
 		if (isLctrlPressed || isRctrlPressed)
 			return 0;
-
-		if (mvdb) { //vdb size has changed. mvdb.
-			vstrand.clear();
-			vstrand_out.clear();
-			make_vdb_table();
-
-			strand = L"<anu>";
-			scan_db();
-			repeats = repeats[0] ? repeats.substr(3) : L"";
-			strand.clear();
-
-			mvdb = 0;
-			return 0;
-		}
 
 		if (rshift_rctrl) {
 			//cout << "rshift_rctrl\n";
