@@ -1793,8 +1793,8 @@ static void scan_db() {
 								for (size_t i = 0; i < vstrand.size(); ++i) {
 									wstring in_ = vstrand.at(i).in[0] && vstrand.at(i).in[vstrand.at(i).in.length() - 1] == '>' ? L"" : vstrand.at(i).g;
 									wcout << i + 1 << L": " << vstrand.at(i).in << in_ << vstrand_out.at(i).out << L"\n";
-									show_fg();
 								}
+								show_fg();
 								rei();
 							}
 							else connect(out);
@@ -2415,7 +2415,7 @@ static void scan_db() {
 							if (qqb(L"<lower>")) {
 								wstring s = L"", b = L"";
 								b = cbGet();
-								for (size_t x = 0; x < b.length(); x++)
+								for (size_t x = 0; x < b.length(); ++x)
 									s += tolower(b[x]);
 								cbSet(s);
 								rei();
@@ -2525,7 +2525,7 @@ static void scan_db() {
 						switch (qq[2]) {
 						case ':':
 							if (testqqb(L"<R:") || testqqb(L"<r:")) {//.h ReplacerDb:
-								if (qq[1] == 'R') { showOutsMsg(L"", qp, L"", 0); }
+								if (qq[1] == 'R') showOutsMsg(L"", qp, L"\n", 0);
 								qp = regex_replace(qp, wregex(L"/"), L"\\");
 								replacerDb = qp;
 								rei();
@@ -2563,7 +2563,6 @@ static void scan_db() {
 								out = getRGB(qq[4] == '>' ? 8 : 1);
 								if (out[0]) c = -1;
 								if (out_speed > 0) out_sleep = 0;
-
 							}
 							else connect(out);
 							break;
@@ -2651,7 +2650,7 @@ static void scan_db() {
 							connect(out);
 						}
 						break;
-					case't':
+					case 't':
 						if (qqb(L"<tab")) kb_press(L"<tab", VK_TAB);
 						else if (qqb(L"<time>") || qqb(L"<time:>")) {
 							wstring w{}; getTime(w);
@@ -2662,8 +2661,8 @@ static void scan_db() {
 						}
 						else connect(out);
 						break;
-					case'u':
-						if (qqb(L"<upper>")) { wstring s = L"", c = L""; c = cbGet(); for (size_t x = 0; x < c.length(); x++) { s += toupper(c[x]); } cbSet(s); rei(); }
+					case 'u':
+						if (qqb(L"<upper>")) { wstring s = L"", c = L""; c = cbGet(); for (size_t x = 0; x < c.length(); ++x) { s += toupper(c[x]); } cbSet(s); rei(); }
 						else if (qqb(L"<up")) kb_press(L"<up", VK_UP);
 						else connect(out);
 						break;
@@ -2671,14 +2670,13 @@ static void scan_db() {
 						if (qqb(L"<v>")) { toggle_visibility(); rei(); }
 						else connect(out);
 						break;
-					case'w':
+					case 'w':
 						if (qqb(L"<win>")) { kb_hold(VK_LWIN); rei(); }
 						else if (qqb(L"<win->")) { kb_release(VK_LWIN); rei(); }
 						else if (qqb(L"<win")) kb_press(L"<win", VK_LWIN);
 						else connect(out);
 						break;
-					case'X':
-					case'x':
+					case 'x':
 						switch (qq[2]) {
 						case 'y':
 							if (testqqb(L"<xy:") || testqqb(L"<xy~:")) {
@@ -2691,7 +2689,8 @@ static void scan_db() {
 									if (qq[3] == '~') { qxcc = pt.x; qycc = pt.y; } //for <~~>
 									else { qx == L"." ? qx = to_wstring(pt.x) : qy = to_wstring(pt.y); }
 								}
-								SetCursorPos(stoi(qx), stoi(qy)); rei();
+								SetCursorPos(stoi(qx), stoi(qy));
+								rei();
 							}
 							else if (qqb(L"<xy>")) {//print pointer
 								POINT pt; GetCursorPos(&pt);
@@ -2770,12 +2769,12 @@ static void scan_db() {
 
 			}
 
-			if (debug == 1) {
-				wcout << "\ninput: " << vstrand.at(i).in << '\n';
-				wcout << "g: " << vstrand.at(i).g << '\n';
-				wcout << "output: " << vstrand_out.at(i).out << '\n';
-				//wcout << "repeat: " << repeat << '\n';
-			}
+			//if (debug == 1) {
+			//	wcout << "\ninput: " << vstrand.at(i).in << '\n';
+			//	wcout << "g: " << vstrand.at(i).g << '\n';
+			//	wcout << "output: " << vstrand_out.at(i).out << '\n';
+			//	//wcout << "repeat: " << *repeat << '\n';
+			//}
 
 			if (multi_.store_[0]) repeats = multi_.store_;
 
