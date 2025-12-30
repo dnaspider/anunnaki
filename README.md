@@ -59,7 +59,9 @@ Also know this:
 
 The input is your shortcut. The output is what will run.
 
-And, each line in db.txt is a slot for its own shortcut (using the multi-line format compresses it to one line by removing new lines and tabs after saving of course).
+And, each line in db.txt is a slot for its own shortcut
+(using the multi-line format compresses it to one line by removing
+new lines and tabs after saving of course).
 
 Simple emoji example:
 
