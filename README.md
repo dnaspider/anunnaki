@@ -21,9 +21,11 @@ Set this up first in Visual Studio Code
 
 Now i'll explain how to program your keyboard to function the way you really want it to.
 
-First thing to do is plan which two keys you'll be using for your shortcut.
-These two keys will be the input. To make it more or less than two keys, in se.txt,
-adjust InputLength, CTRL+S, and now lets start adding codes to c:\anu\db.txt.
+First thing to do is plan which two keys you'll be using for your shortcut. I made it so each key shows its corresponding value in the program when the key is pressed. Have a look. 
+These keys are pretty much the input (to make it more or less then two keys, in c:\anu\se.txt,
+adjust InputLength; CTRL+S to update the program). 
+
+Lets start adding codes to c:\anu\db.txt.
 
 But first, know this:
 
@@ -33,10 +35,6 @@ program will update itself to see the codes.
 
 Codes in c:\anu\db.txt have this format
 (with the symbol between the input and output):
-
-The input is your shortcut. The output is what will run.
-
-Each line in db.txt is for its own shortcut.
 
 in out
 in-out
@@ -54,6 +52,12 @@ Use space or - character as the middle symbol for auto backspace input
 
 Use > when you want it to output the input as well for whatever reason for repeat
 (see further below which key to press for repeat).
+
+Also know this:
+
+The input is your shortcut. The output is what will run.
+
+And, each line in db.txt is a slot for its own shortcut (using the multi-line format compresses it to one line by removing new lines and tabs after saving of course).
 
 Simple emoji example:
 
