@@ -21,7 +21,9 @@ Set this up first in Visual Studio Code
 
 Now i'll explain how to program your keyboard to function the way you really want it to.
 
-First thing to do is plan which two keys you'll be using for your shortcut. I made it so each key shows its corresponding value in the program when the key is pressed. Have a look. 
+First thing to do is plan which two keys you'll be using for your shortcut.
+I made it so each key shows its corresponding value in the program
+when the key is pressed. Have a look. 
 These keys are pretty much the input (to make it more or less then two keys, in c:\anu\se.txt,
 adjust InputLength; CTRL+S to update the program). 
 
