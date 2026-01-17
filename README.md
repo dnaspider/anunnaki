@@ -36,7 +36,7 @@ press CTRL+S to save. When pressing CTRL+S, the
 program will update itself to see the codes.
 
 Codes in c:\anu\db.txt have this format
-(with the coresponding middle-symbol between the input and output):
+(with the corresponding middle-symbol between the input and output):
 
 in out
 in-out
