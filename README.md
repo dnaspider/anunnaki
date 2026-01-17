@@ -24,7 +24,7 @@ I made it so each key shows its corresponding value in the program
 when the key is pressed. Look:
 <img alt="image" src="https://github.com/user-attachments/assets/fb97b010-7340-4ca3-8988-ed7085642a3a" />
 
-These keys are pretty much the input (to make it more or less then two keys,
+These keys are pretty much the input (to make it more or less than two keys,
 in c:\anu\se.txt, adjust the InputLength setting; CTRL+S to update the program). 
 
 Lets start adding codes to c:\anu\db.txt.
@@ -51,7 +51,7 @@ in\>
 \
 
 Using the multi-line format compresses it to one line by removing
-new lines and tabs after saving of course.
+newlines and tabs after saving of course.
 
 Use space or - character as the middle symbol for auto-backspace-input
 (like in the first two examples above).
@@ -65,7 +65,6 @@ The input section is for your shortcut.
 The output section is what will run.
 
 And, each line in db.txt is a slot for its own shortcut.
-
 Imagine it looks something like this:
 [input][middle-symbol][output]
 [input][middle-symbol][output]
@@ -91,15 +90,18 @@ I RCTRL...
 To repeat, press:
 PAUSE/BREAK key
 or 
-RCTRL+LCTRL
+RCTRL+LCTRL (Hold RCTRL, press LCTRL, release RCTRL)
+
+If these keys aren't available on your keyboard,
+press EQUAL+ESC for repeat. COMMA+ESC instead of RCTRL for running.
 
 To clear the input, press BACKSPACE a few times or use this combo:
 Hold RSHIFT, Press LSHIFT three times, release RSHIFT
 (Pressing LSHIFT only twice clears it to &lt;.
-Press once when its alredy cleared for &lt;
+Press once when it's already cleared for &lt;
 or for run if it's filled with an input).
 
-Lets expand.
+Let's expand.
 
 For teleport and mouse press, click in db.txt,
 hover over the target, press P+ESC.
@@ -120,7 +122,7 @@ Maybe sometimes you might have to slow it down and put some wait time like this
   
 in &lt;xy~:273 1365>&lt;,>&lt;lc>&lt;,>&lt;~~>
   
-Maybe thats not enough time (160ms default).
+Maybe that's not enough time (160ms default).
 Add more milliseconds to this like so: &lt;,1000> (this is one second).
 
 Can also use the &lt;speed:> option instead:
