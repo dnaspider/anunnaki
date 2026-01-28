@@ -80,7 +80,6 @@ bool show_strand = 1;
 bool auto_bs_repeat_key = 0;
 bool ctrl_scan_only_mode = 0;
 bool close_ctrl_mode = 1;
-bool ManualRepeat = 1;
 bool hold_shift = 0;
 bool out_sleep = 1;
 bool stop = 0, pause = 0;
@@ -381,7 +380,6 @@ static void load_settings() {
 	if (!f) {
 		f.close();
 		showOutsMsg(L"", L"\\n\\4Settings \\7\\0C\\" + settings + L"\\0C\\\\4 not found!\\7\\n", L"", 1);
-		if (!settings[0]) { cout << "Create c:\\anu\\se.txt manually\n"; }
 		return;
 	}
 
@@ -418,8 +416,6 @@ static void load_settings() {
 		{ if (check_if_num(v) > L"") { RSHIFTLSHIFT_Only = stoi(v); rri = 0; } else er(); } break;
 		case 1972://RSHIFT+CtrlKey_Toggle:
 		{ if (check_if_num(v) > L"") RSHIFTCtrlKeyToggle = stoi(v); else er(); } break;
-		case 1273://ManualRepeat:
-		{ if (v == L"0" || v == L"1") ManualRepeat = stoi(v); else er(); } break;
 		case 865://PauseKey:
 		{ if (check_if_num(v) > L"") PauseKey = stoi(v); else er(); } break;
 		case 1708://Loop_Insert_Text:
@@ -794,7 +790,6 @@ static void printSe() {
 	wcout << "EditorDb: "; wcout << editorDb << '\n';
 	wcout << "EditorSe: "; wcout << editorSe << '\n';
 	wcout << "Loop_Insert_Text: " << Loop_Insert_Text << '\n';
-	wcout << "ManualRepeat: " << ManualRepeat << '\n';
 	cout << endl;
 }
 
@@ -3362,7 +3357,7 @@ int main() {
 				if (num) {
 					db_ = LR"(<anu\><esc><:\4\0C\
                                           __   .__  \n
-_____    ____  __ __  ____   ____ _____  |  | _|__|\0C\\7.5\4\0C\\n
+_____    ____  __ __  ____   ____ _____  |  | _|__|\0C\\7.6\4\0C\\n
 \__  \  /    \|  |  \/    \ /    \\__  \ |  |/ /  | \n
  / __ \|   |  \  |  /   |  \   |  \/ __ \|    <|  | \n
 (____  /___|  /____/|___|  /___|  (____  /__|_ \__| \n
