@@ -949,11 +949,11 @@ static wstring get_out(wstring q) {
 
 				b = L"<" + q.substr(a.length() + 3);
 
-				if (b == L"<" + g)
-					return vstrand_out.at(n).out; // go to line #; <!#!>
-
-				if (vstrand.at(n).in == b && vstrand.at(n).g == g)
-					return vstrand_out.at(n).out; //<!#!x:>
+				// go to line #; <!#!> || <!#!x:>
+				if (b == L"<" + g || vstrand.at(n).in == b && vstrand.at(n).g == g) {
+					found_io = n + 1;
+					return vstrand_out.at(n).out;
+				}
 			}
 
 			return L"";
@@ -964,8 +964,10 @@ static wstring get_out(wstring q) {
 		n = vstrand.size() > 1 && found_io != vstrand.size() ? found_io : n;		
 
 		for (; n != found_io - 1; ++n) { //<!x:>
-			if (vstrand.at(n).in == b && vstrand.at(n).g == g)
+			if (vstrand.at(n).in == b && vstrand.at(n).g == g) {
+				found_io = n + 1;
 				return vstrand_out.at(n).out;
+			}
 			if (n == vstrand.size() - 1) n = -1;
 		}
 	}
@@ -979,16 +981,20 @@ static wstring get_out(wstring q) {
 		b = L"<" + q.substr(2);
 
 		for (; n != found_io - 1; --n) { //<^b:>
-			if (vstrand.at(n).in == b && vstrand.at(n).g == g)
+			if (vstrand.at(n).in == b && vstrand.at(n).g == g) {
+				found_io = n + 1;
 				return vstrand_out.at(n).out;
+			}
 			if (n == 0) n = vstrand.size();
 		}
 	}
 		break;
 	default: //regular top to bottom scan; <x:>
 		for (; n < vstrand.size(); ++n)
-			if (vstrand.at(n).in == q && vstrand.at(n).g == g)
+			if (vstrand.at(n).in == q && vstrand.at(n).g == g) {
+				found_io = n + 1;
 				return vstrand_out.at(n).out;
+			}
 	}
 
 	return L"";
@@ -1319,7 +1325,6 @@ static void toggle_visibility() {
 	else
 		show_fg();
 
-	sleep(frequency);
 	strand.clear();
 }
 
