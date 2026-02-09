@@ -45,7 +45,7 @@ string delimiter = "\n"; //°";
 vector<Strand> vstrand{};
 vector<Strand_out> vstrand_out{};
 size_t c = 0;
-size_t found_io = 0, found_io_repeat = 0, io_count = 0;
+size_t found_io = 0, found_io_repeat = 0;
 double RgbScaleLayout = 1.00; //100%
 double ic = 0; //<+> icp
 int qxcc = 0, qycc = 0;
@@ -952,7 +952,6 @@ static wstring get_out(wstring q) {
 				// go to line #; <!#!> || <!#!x:>
 				if (b == L"<" + g || vstrand.at(n).in == b && vstrand.at(n).g == g) {
 					found_io = n + 1;
-					if (io_count == 1) repeats = vstrand_out.at(found_io_repeat - 1).out; //found_io_repeat
 					return vstrand_out.at(n).out;
 				}
 			}
@@ -1454,7 +1453,6 @@ static void scan_db() {
 
 	if (repeats[0] != '>') found_io_repeat = 0;
 	found_io = 0;
-	io_count = 0;
 	stop = 0;
 	bool fallthrough_ = 0;
 
@@ -1510,13 +1508,10 @@ static void scan_db() {
 					out = repeats = vstrand_out.at(i).out;
 				}
 
+				found_io = found_io_repeat = i + 1;
 			}
 
 			//run output
-
-			found_io = i + 1;
-			io_count++;
-			if (io_count == 1) found_io_repeat = i + 1; //set first hit
 
 			if (replacerDb[0]) is_replacer(out); //<r:>
 
