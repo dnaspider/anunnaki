@@ -45,7 +45,7 @@ string delimiter = "\n"; //°";
 vector<Strand> vstrand{};
 vector<Strand_out> vstrand_out{};
 size_t c = 0;
-size_t found_io = 0;
+size_t found_io = 0, found_io_repeat = 0;
 double RgbScaleLayout = 1.00; //100%
 double ic = 0; //<+> icp
 int qxcc = 0, qycc = 0;
@@ -952,6 +952,8 @@ static wstring get_out(wstring q) {
 				// go to line #; <!#!> || <!#!x:>
 				if (b == L"<" + g || vstrand.at(n).in == b && vstrand.at(n).g == g) {
 					found_io = n + 1;
+					if (q == repeats.substr(0, q.length()) && (repeats[1] == '!' || repeats[1] == '^')) //found_io_repeat
+						repeats = vstrand.at(found_io).in;
 					return vstrand_out.at(n).out;
 				}
 			}
@@ -961,7 +963,7 @@ static wstring get_out(wstring q) {
 
 		b = L"<" + q.substr(2);
 
-		n = vstrand.size() > 1 && found_io != vstrand.size() ? found_io : n;		
+		n = found_io < vstrand.size() ? found_io : n;		
 
 		for (; n != found_io - 1; ++n) { //<!x:>
 			if (vstrand.at(n).in == b && vstrand.at(n).g == g) {
@@ -1058,14 +1060,17 @@ static wstring connect(wstring& w, bool bg = 0) {
 		wstring o = get_out(qqs);
 		
 		if (o[0]) {
-			if (bg) return replacerDb[0] ? is_replacer(o) : o;
+			if (qqs == repeats.substr(0, qqs.length()) && (repeats[1] == '!' || repeats[1] == '^')) //found_io_repeat
+				repeats = L"<" + repeats.substr(2); //<!x:> to <x:>
 
+			if (bg) return replacerDb[0] ? is_replacer(o) : o;
 			w = o + qq.substr(qqs.length());
 			if (replacerDb[0]) is_replacer(w);
 			c = -1;
 			if (out_speed > 0) out_sleep = 0;
 			return L"";
 		}
+		//else use <x:><''> for exit
 	}
 	printq();
 	return L"";
@@ -1451,6 +1456,7 @@ static void multi_sleep(Multi_ &multi_, unsigned long ms, unsigned long n = 1) {
 static void scan_db() {
 
 	bool fallthrough_ = 0; found_io = 0; stop = 0;
+	if (repeats[0] != '>') found_io_repeat = 0;
 
 	for (size_t i = 0; i < vstrand.size(); ++i)
 	{
@@ -1470,14 +1476,16 @@ static void scan_db() {
 				repeats = repeats.substr(1);
 				if (!repeats[0]) return;
 				out = repeats;
+				found_io = found_io_repeat;
 			}
 			else {
 				repeat_switch = 0;
 
 				//fallthrough
 				if (fallthrough_ && !vstrand.at(i).ft) fallthrough_ = 0;
+				if (!fallthrough_ && found_io_repeat == 0) found_io_repeat = i + 1; //set first hit
 				if (vstrand.at(i).ft) { fallthrough_ = 1; continue; }
-
+				
 				//backspace input depending on g and set repeat and input accordingly
 				switch (vstrand.at(i).g[0])
 				{
