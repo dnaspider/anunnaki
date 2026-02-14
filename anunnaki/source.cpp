@@ -405,7 +405,7 @@ static void load_settings() {
 				if (v == L"0" || v == L"1") {
 					utf_8 = stoi(v);
 					if (utf_8 && !u8) call_utf8();
-					//num_error(L"Reload program for", L"1", L"UTF_8:");
+					//num_error(L"Reload program for", L"1", L"UTF_8:")
 					wcout.flush().clear();
 				}
 				else er();
@@ -961,7 +961,7 @@ static wstring get_out(wstring q) {
 
 		b = L"<" + q.substr(2);
 
-		n = found_io < vstrand.size() ? found_io : n;		
+		n = found_io < vstrand.size() ? found_io : n;
 
 		for (; n != found_io - 1; ++n) { //<!x:>
 			if (vstrand.at(n).in == b && vstrand.at(n).g == g) {
@@ -1094,6 +1094,7 @@ G+ESC		RGBXY to clipboard (cb) in 3 sec.
 Set mouse pointer over target, press G+ESC, then move it away
 
 Input Output Syntax (c:\anu\db.txt)
+i:o
 i o		Use space or - for auto backspace input
 i-o
 i>o		Use > for remember input for [RepeatKey]
@@ -1126,7 +1127,8 @@ Database
 Mouse event
 <~>		Set current position
 <xy:>		Move to
-<xy~:>		Auto set. Use <~~> to return where it was
+<xy~:>		Auto set
+<~~>		Return
 <lc>		LEFT CLICK
 <rc>		RIGHT
 <mc>		MIDDLE
@@ -1175,8 +1177,8 @@ Open true false link slots with SPACE
 Continue if true or false. Use <
 <ifapp~:t,1,1,< <>
 
-Loop feedback message. Use ' (optional)
-<ifapp~:'?'t,1,1,<t: <f:>
+Loop feedback message. Use '
+<ifapp~:'?'t,1,1,<t: <f:> (extended)
 
 Link and continue. Use <
 <ifapp~:t, 1, 1, <t: <f:><'1>
@@ -1192,7 +1194,7 @@ in <out:>
 <t:><'\Gtrue\W>
 <f:><'\Rfalse\W>
 
-Print to console:
+Print to Terminal:
 <:x\n>	Custom message
 <'x>	Auto newline
 <' x>	No print. Use SPACE
@@ -1320,7 +1322,7 @@ VS Code: "[plaintext]": { "editor.insertSpaces": false,
 static void toggle_visibility() {
 	if (IsWindowVisible(GetConsoleWindow())) {
 		SetForegroundWindow(GetConsoleWindow());
-		kb(VK_F12); //if title "Select" x86
+		//kb(VK_F12); //if title "Select" x86
 		ShowWindow(GetConsoleWindow(), SW_HIDE);
 	}
 	else
@@ -1508,6 +1510,7 @@ static void scan_db() {
 					out = repeats = vstrand_out.at(i).out;
 				}
 
+				//set first hit
 				found_io = found_io_repeat = i + 1;
 			}
 
@@ -2773,13 +2776,6 @@ static void scan_db() {
 
 			}
 
-			//if (debug == 1) {
-			//	wcout << "\ninput: " << vstrand.at(i).in << '\n';
-			//	wcout << "g: " << vstrand.at(i).g << '\n';
-			//	wcout << "output: " << vstrand_out.at(i).out << '\n';
-			//	//wcout << "repeat: " << *repeat << '\n';
-			//}
-
 			if (multi_.store_[0]) repeats = multi_.store_;
 
 			break;
@@ -2825,7 +2821,7 @@ static void repeat() {
 		thread.detach();
 	}
 		break;
-	case 1: { //esc + p
+	case 1: { //p + esc
 		bool s = show_strand; show_strand = 0;
 
 		printq();
@@ -2836,17 +2832,17 @@ static void repeat() {
 		prints();
 	}
 		break;
-	case 2: //esc + r
+	case 2: //r + esc
 		printq();
 		run(getRGB());
 		break;
-	case 3: //esc + g
+	case 3: //g + esc
 		qq.clear();
 		getRGB(1);
 		if (strand[0]) strand.clear();
 		prints();
 		break;
-	case 4: { //esc + a
+	case 4: { //a + esc
 		bool s = show_strand; show_strand = 0;
 
 		sleep(frequency / 2);
@@ -2883,7 +2879,7 @@ static void key(wstring k) {
 	strand.append(k);
 
 	if (k[0] == '>' || !close_ctrl_mode) {
-		//scan_db();
+		//scan_db()
 		if (k[0] == '>') prints();
 		thread thread(scan); thread.detach();
 		if (close_ctrl_mode) return;
@@ -2959,7 +2955,7 @@ static LRESULT CALLBACK LowLevelKeyboardProc(int nCode, WPARAM wParam, LPARAM lP
 					if (!utf_8)
 						strand.pop_back();
 					else {
-						if(strand.length() == 1 || strand[strand.length() - 1] > 32 && strand[strand.length() - 1] < 128 || (strand[strand.length() - 1] & 0xc0) != 0x80)
+						if (strand.length() == 1 || strand[strand.length() - 1] > 32 && strand[strand.length() - 1] < 128 || (strand[strand.length() - 1] & 0xc0) != 0x80)
 							strand.pop_back();
 						else {
 							unsigned short bits{};
@@ -3249,7 +3245,6 @@ static LRESULT CALLBACK LowLevelKeyboardProc(int nCode, WPARAM wParam, LPARAM lP
 							if (isRshiftPressed) { if (RSHIFTCtrlKeyToggle && breaker <= 2) rshift_rctrl = 1; break; }
 							//cout << "breaker: " << breaker << "\n";
 							if (breaker <= cKeyMax && !isLctrlPressed && !isLshiftPressed) {
-								//toggled = 1;
 								breaker = 0;
 								if (RSHIFTLSHIFT_Only && !strand[0] && !rri) return 0;
 								if (!strand[0]) strand = L"<";
