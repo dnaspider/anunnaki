@@ -90,15 +90,15 @@ bool ccm = 0; //close_ctrl_mode toggle
 
 struct Multi_ {
 	wstring out_,
-		qq_ = qq,
-		qp_ = qp,
-		store_ = L"";
+		qq_,
+		qp_,
+		store_{};
 	size_t
-		c_ = c;
+		c_{};
 	double
-		icp_ = 0;
+		icp_{};
 	bool
-		br_ = 0;
+		br_{};
 };
 
 #pragma region protos
@@ -360,6 +360,9 @@ static void showOutsMsg(wstring s, wstring w, wstring s1 = L"", bool make_color 
 			case 'g':
 			{ if (make_color) write(L">"); }
 			break;
+			//case 'i': //input
+			//{ if (make_color) write(vstrand.at(found_io - 1).in); }
+			//break;
 			}
 			if (t) continue;
 		}
@@ -1198,6 +1201,7 @@ Print to Terminal:
 <:x\n>	Custom message
 <'x>	Auto newline
 <' x>	No print. Use SPACE
+<'>		Print input
 		
 Options:
 \1-9    Color (or use \012\, \R, \G, \B, \W)
@@ -1591,7 +1595,7 @@ static void scan_db() {
 								if (!v[0]) {
 									kb(VK_BACK);
 									sleep(frequency / 2);
-									num_error(L"Not found", qq, L"VALUE:");
+									num_error(L"No output", qq, L"VALUE:");
 								}
 								else {
 									repeats = v;
@@ -1701,6 +1705,7 @@ static void scan_db() {
 					case'\'':
 						if (qqb(L"<''")) c = out.length();//<''ignore>...
 						else if (qqb(L"<'")) { //<'comments>
+							if (qq[2] == '>') wcout << vstrand.at(found_io - 1).in << '\n'; else //<'>
 							if (show_strand) {
 								if (qq[2] != ' ') {
 									wstring v = qq.substr(2, qq.find('>') - 2);
@@ -2168,12 +2173,11 @@ static void scan_db() {
 													if (check_if_num(t, L"CHECK RGBXY slot") != L"") { stop = 1; break; }
 												}
 
-												POINT pt;
 												COLORREF color;
 												HDC hDC;
 												hDC = GetDC(NULL);
 												if (X[0]) { color = GetPixel(hDC, int(stoi(X) * RgbScaleLayout), int(stoi(Y) * RgbScaleLayout)); }
-												else { GetCursorPos(&pt); color = GetPixel(hDC, int(pt.x * RgbScaleLayout), int(pt.y * RgbScaleLayout)); }
+												else { POINT pt; GetCursorPos(&pt); color = GetPixel(hDC, int(pt.x * RgbScaleLayout), int(pt.y * RgbScaleLayout)); }
 												ReleaseDC(NULL, hDC);
 												if (color != CLR_INVALID
 													&& GetRValue(color) == stoi(R)
@@ -2333,7 +2337,7 @@ static void scan_db() {
 
 								if (stop) { stop = 0; c = out.length(); break; }
 
-								if (qq[3] == 'r' && qq[6] == '~' && multi_.br_ && !stop)
+								if (qq[3] == 'r' && qq[6] == '~' && multi_.br_ && !stop && X[0] && Y[0])
 									SetCursorPos(stoi(X), stoi(Y));
 
 								if (tf_T[0] || tf_F[0] || tf[0] && !tf_F[0]) {
@@ -3361,7 +3365,7 @@ int main() {
 				if (num) {
 					db_ = LR"(<anu\><esc><:\4\0C\
                                           __   .__  \n
-_____    ____  __ __  ____   ____ _____  |  | _|__|\0C\\7.6\4\0C\\n
+_____    ____  __ __  ____   ____ _____  |  | _|__|\0C\\7.7\4\0C\\n
 \__  \  /    \|  |  \/    \ /    \\__  \ |  |/ /  | \n
  / __ \|   |  \  |  /   |  \   |  \/ __ \|    <|  | \n
 (____  /___|  /____/|___|  /___|  (____  /__|_ \__| \n
