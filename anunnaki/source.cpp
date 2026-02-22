@@ -28,7 +28,8 @@ Kb_Key_F1 = L"", Kb_Key_F2 = L">", Kb_Key_F3 = L"", Kb_Key_F4 = L"", Kb_Key_F5 =
 Kb_Key_Left = L"", Kb_Key_Up = L"", Kb_Key_Right = L"", Kb_Key_Down = L"",
 Kb_Key_Esc = L"", Kb_Key_Space = L"", Kb_Key_Tab = L"", Kb_Key_Enter = L"", Kb_Key_Caps = L"", Kb_Key_Grave_Accent = L"", Kb_Key_Minus = L"", Kb_Key_Equal = L"", Kb_Key_Left_Bracket = L"", Kb_Key_Right_Bracket = L"", Kb_Key_Backslash = L"", Kb_Key_Semicolon = L"", Kb_Key_Quote = L"", Kb_Key_Comma = L"", Kb_Key_Period = L"", Kb_Key_Forwardslash = L"", Kb_Key_Menu = L"",
 Kb_Key_Print_Screen = L"", Kb_Key_ScLk = L"", Kb_Key_Insert = L"", Kb_Key_Delete = L"", Kb_Key_Home = L"", Kb_Key_End = L"", Kb_Key_PgUp = L"", Kb_Key_PgDn = L"",
-Kb_Key_Numpad_0 = L"", Kb_Key_Numpad_1 = L"", Kb_Key_Numpad_2 = L"", Kb_Key_Numpad_3 = L"", Kb_Key_Numpad_4 = L"", Kb_Key_Numpad_5 = L"", Kb_Key_Numpad_6 = L"", Kb_Key_Numpad_7 = L"", Kb_Key_Numpad_8 = L"", Kb_Key_Numpad_9 = L"", Kb_Key_Numlock = L"", Kb_Key_Numpad_Divide = L"", Kb_Key_Numpad_Multiply = L"", Kb_Key_Numpad_Minus = L"", Kb_Key_Numpad_Add = L"", Kb_Key_Numpad_Period = L"", Kb_Key_Numpad_Enter = L""
+Kb_Key_Numpad_0 = L"", Kb_Key_Numpad_1 = L"", Kb_Key_Numpad_2 = L"", Kb_Key_Numpad_3 = L"", Kb_Key_Numpad_4 = L"", Kb_Key_Numpad_5 = L"", Kb_Key_Numpad_6 = L"", Kb_Key_Numpad_7 = L"", Kb_Key_Numpad_8 = L"", Kb_Key_Numpad_9 = L"", Kb_Key_Numlock = L"", Kb_Key_Numpad_Divide = L"", Kb_Key_Numpad_Multiply = L"", Kb_Key_Numpad_Minus = L"", Kb_Key_Numpad_Add = L"", Kb_Key_Numpad_Period = L"", Kb_Key_Numpad_Enter = L"",
+Kb_Key_Pause = L">"
 ;
 wstring database = L"c:\\anu\\db.txt",
 settings = L"c:\\anu\\se.txt",
@@ -54,7 +55,7 @@ unsigned short frequency = 160;
 unsigned short strand_length = 2;
 unsigned short RSHIFTLSHIFT_Only = 0, rri = 0; //RSHIFTLSHIFT_Only 1 or 2 for L+ESC mode on; 2 for non <
 unsigned short cKey = 29, cKeyMax = 2; // Scan code for VK_RCONTROL
-unsigned short repeat_key = 69; // Scan code for VK_PAUSE;
+unsigned short repeat_key = 70; // Scan code for VK_SCROLL;
 unsigned short PauseKey = 88; //Scan code for VK_F12
 unsigned short repeat_switch = 0;
 unsigned short debug = 0;
@@ -104,7 +105,6 @@ struct Multi_ {
 #pragma region protos
 static void showOutsMsg(wstring, wstring, wstring, bool),
 	run(wstring),
-	scan_db(),
 	repeat()
 ;
 
@@ -358,8 +358,9 @@ static void showOutsMsg(wstring s, wstring w, wstring s1 = L"", bool make_color 
 				if (!make_color) ++x;
 				break;
 			case 'g':
-			{ if (make_color) write(L">"); }
-			break;
+				write(L">");
+				if (!make_color) ++x;
+				break;
 			//case 'i': //input
 			//{ if (make_color) write(vstrand.at(found_io - 1).in); }
 			//break;
@@ -532,10 +533,11 @@ static void load_settings() {
 			Kb_Key_Down = v; break;
 		case 1210://Kb_Key_Space:
 			Kb_Key_Space = v; break;
-		case 1228://Kb_Key_Enter: | Kb_Key_Right:
+		case 1228://Kb_Key_Enter: | Kb_Key_Right: | Kb_Key_Pause:
 		{
 			if (se == L"Kb_Key_Enter:") Kb_Key_Enter = v;
 			else if (se == L"Kb_Key_Right:") Kb_Key_Right = v;
+			else if (se == L"Kb_Key_Pause:") Kb_Key_Pause = v;
 		} break;
 		case 1109://Kb_Key_Caps:
 			Kb_Key_Caps = v; break;
@@ -788,6 +790,7 @@ static void printSe() {
 	wcout << "Kb_Key_Semicolon: " << Kb_Key_Semicolon << '\n';
 	wcout << "Kb_Key_Space: " << Kb_Key_Space << '\n';
 	wcout << "Kb_Key_Tab: " << Kb_Key_Tab << '\n';
+	wcout << "Kb_Key_Pause: " << Kb_Key_Pause << '\n';
 	cout << "AutoBs_RepeatKey: " << auto_bs_repeat_key << '\n';
 	wcout << "Editor: " << editor << '\n';
 	wcout << "EditorDb: "; wcout << editorDb << '\n';
@@ -1111,10 +1114,10 @@ i <i:>
 i		Fallthrough
 ii o
 
-Use RCTRL, F2, RSHIFT+LSHIFT, or COMMA+ESC after input to run
+Use RCTRL, F2, PAUSE, RSHIFT+LSHIFT, or COMMA+ESC after input to run
 
 Repeat:
-Use PAUSE [RepeatKey 69], RCTRL+LCTRL, or EQUAL+ESC
+Use SCROLL [RepeatKey 70], RCTRL+LCTRL, or EQUAL+ESC
 
 Clear input:
 Hold RSHIFT, Press LSHIFT three times
@@ -3148,6 +3151,7 @@ static LRESULT CALLBACK LowLevelKeyboardProc(int nCode, WPARAM wParam, LPARAM lP
 				case 52: if (Kb_Key_Period[0]) key(Kb_Key_Period); return 0;
 				case 93: if (Kb_Key_Menu[0]) key(Kb_Key_Menu); return 0;
 				
+				case 69:
 				case 72:
 				case 75:
 				case 77:
@@ -3203,7 +3207,9 @@ static LRESULT CALLBACK LowLevelKeyboardProc(int nCode, WPARAM wParam, LPARAM lP
 						if (!extended) { if (Kb_Key_Numpad_Enter[0]) key(Kb_Key_Numpad_Enter); return 0; }
 						if (Kb_Key_Enter[0]) key(Kb_Key_Enter); return 0;
 					case 69:
-						if (extended) if (Kb_Key_Numlock[0]) key(Kb_Key_Numlock); return 0;
+						if (extended) { if (Kb_Key_Numlock[0]) key(Kb_Key_Numlock); return 0; }
+						if (Kb_Key_Pause[0]) key(Kb_Key_Pause);
+						return 1;
 					}
 				}
 					break;
@@ -3370,11 +3376,11 @@ _____    ____  __ __  ____   ____ _____  |  | _|__|\0C\\7.7\4\0C\\n
  / __ \|   |  \  |  /   |  \   |  \/ __ \|    <|  | \n
 (____  /___|  /____/|___|  /___|  (____  /__|_ \__| \n
      \/     \/           \/     \/     \/     \/>
-<:\n\7WELCOME! [\T] [\012\?+ESC\7]\n><db >
+<:\n\7WELCOME! [\T] [\012\?+ESC\7]\n><db->
 \
 
 db
-<db ><wr:>c:\anu\db.txt<enter>
+<db-><wr:>c:\anu\db.txt<enter>
 
 <wr:><win>r<win-><ifapp~:run,6,9>
 
