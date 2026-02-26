@@ -676,7 +676,6 @@ static void load_settings() {
 }
 
 static void printSe() {
-	if (qq[1] == 's') load_settings();
 	wcout << settings << '\n'; ifstream f(settings); if (f.fail()) { showOutsMsg(L"Copy to ", settings, L"\n", 0); } f.close();
 	cout << "StartHidden: " << start_hidden << '\n';
 	wcout << "Settings: " << settings << '\n';
@@ -1123,12 +1122,14 @@ Clear input:
 Hold RSHIFT, Press LSHIFT three times
 
 Settings
-<se>		Reload; print to console. Use SE to only print
+<se>		Reload and show
 <se:>		Load other (<se:c:\anu\se1.txt>)
+<SE>		Reload
 
 Database
-<db>		Print
+<db>		Show
 <db:>		Load too. Use se.txt [Database] for fresh db
+<DB>		Reload
 
 Mouse event
 <~>		Set current position
@@ -1804,12 +1805,17 @@ static void scan_db() {
 								database = t;
 								break;
 							}
-							else if (qqb(L"<db>")) { 
-								for (size_t i = 0; i < vstrand.size(); ++i) {
-									wstring in_ = vstrand.at(i).in[0] && vstrand.at(i).in[vstrand.at(i).in.length() - 1] == '>' ? L"" : vstrand.at(i).g;
-									wcout << i + 1 << L": " << vstrand.at(i).in << in_ << vstrand_out.at(i).out << L"\n";
+							else if (qqb(L"<db>") || qqb(L"<DB>")) {
+								if (qq[1] == 'D') {
+									vstrand.clear(); vstrand_out.clear(); make_vdb_table();
 								}
-								show_fg();
+								else {
+									for (size_t i = 0; i < vstrand.size(); ++i) {
+										wstring in_ = vstrand.at(i).in[0] && vstrand.at(i).in[vstrand.at(i).in.length() - 1] == '>' ? L"" : vstrand.at(i).g;
+										wcout << i + 1 << L": " << vstrand.at(i).in << in_ << vstrand_out.at(i).out << L"\n";
+									}
+									show_fg();
+								}
 								rei();
 							}
 							else connect(out);
@@ -2605,8 +2611,8 @@ static void scan_db() {
 							connect(out);
 						}
 						break;
-					case's':
-					case'S':
+					case 's':
+					case 'S':
 						switch (qq[2]) {
 						case 'E':
 						case 'e':
@@ -2623,7 +2629,14 @@ static void scan_db() {
 								rei();
 								break;
 							}
-							else if (qqb(L"<se>") || qqb(L"<SE>")) { printSe(); show_fg(); rei(); }
+							else if (qqb(L"<se>") || qqb(L"<SE>")) { 
+								if (debug != 1) load_settings();
+								if (qq[1] == 's') {
+									printSe();
+									show_fg();
+								}
+								rei();
+							}
 							else connect(out);
 							break;
 						case 'h':
@@ -3282,7 +3295,7 @@ static LRESULT CALLBACK LowLevelKeyboardProc(int nCode, WPARAM wParam, LPARAM lP
 		if (isLshiftPressed || isRshiftPressed)
 			return 0;
 		
-		//lctrl+s
+		//ctrl+s
 		if (ctrl_s) {
 			ctrl_s = 0;
 			isLctrlPressed = 0;
@@ -3370,14 +3383,14 @@ int main() {
 				}
 				if (num) {
 					db_ = LR"(<anu\ ><:\R\n
-      /    \      \n
-  __ /\_  _/\ __  \n
- / / \  \/  / \ \ \n
-/ /  \7ANUNNAKi\R  \ \ \n
-\ \   / \7.7\R \   / / \n
- \_\ /  /\  \ /_/ \n
-     \ /  \ /     \n
-      \    /      \n\n
+         /    \ \n
+    __ // \  / \\\ __\n
+   / / \\\  \/  // \ \ \n
+  / /   \7ANUNNAKi\R   \ \ \n
+  \ \\   // \7.7\R \\\   / /\n
+   \_\ //  /\  \\\ /_/\n
+       \\\\ /  \ //\n
+         \    /\n\n
 \7WELCOME! [\T] [\012\?+ESC\7]\n\n><db->
 \
 
