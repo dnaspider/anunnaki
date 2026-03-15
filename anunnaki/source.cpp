@@ -1017,7 +1017,12 @@ static wstring is_replacer(wstring& q) { // Replacer | {var:} {var-} {var>} | <r
 			tq = q;
 			if (q[0]) {
 				if (q[0] == '\'' && q != L"'") { tqg.replace(tqg.find('{'), 2 + q.length(), L""); q = tqg; continue; } //{'ignore}
-				q = get_out(q);
+				if (q.length() > 1 && (q[q.length() - 1] == ' ' || q[q.length() - 1] == '-' || q[q.length() - 1] == ':' || q[q.length() - 1] == '>'))
+					q = get_out(q);
+				else {
+					q = tqg;
+					return q;
+				}
 			}
 			if (!q[0]) {
 				tqg.replace(tqg.find('{'), 1, L"::_::"); q = tqg;
@@ -1205,7 +1210,7 @@ Print to Terminal:
 <:x\n>	Custom message
 <'x>	Auto newline
 <' x>	No print. Use SPACE
-<'>		Print input
+<'>	Print input
 		
 Options:
 \1-9    Color (or use \012\, \R, \G, \B, \W)
@@ -2713,8 +2718,16 @@ static void scan_db() {
 								}
 								if (qx[0] == '.' || qy[0] == '.' || qq[3] == '~') {//Use . for current pt | <xy:. 0>  <t-<ifxy:0 . | . 0 | . 864 | 1638 .,1,1000,:>1
 									POINT pt; GetCursorPos(&pt);
-									if (qq[3] == '~') { qxcc = pt.x; qycc = pt.y; } //for <~~>
-									else { qx == L"." ? qx = to_wstring(pt.x) : qy = to_wstring(pt.y); }
+									if (qq[3] == '~') { //<~~>
+										qxcc = pt.x;
+										qycc = pt.y;
+									}
+									
+									if (qx == L".")
+										qx = to_wstring(pt.x);
+									if (qy == L".")
+										qy = to_wstring(pt.y);
+									
 								}
 								SetCursorPos(stoi(qx), stoi(qy));
 								rei();
@@ -3387,7 +3400,7 @@ int main() {
     __ // \  / \\\ __\n
    / / \\\  \/  // \ \ \n
   / /   \7ANUNNAKi\R   \ \ \n
-  \ \\   // \7.7\R \\\   / /\n
+  \ \\   // \7.8\R \\\   / /\n
    \_\ //  /\  \\\ /_/\n
        \\\\ /  \ //\n
          \    /\n\n
