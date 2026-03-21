@@ -1130,6 +1130,7 @@ Settings
 <se>		Reload and show
 <se:>		Load other (<se:c:\anu\se1.txt>)
 <SE>		Reload
+<SE:>		Soft load
 
 Database
 <db>		Show
@@ -1714,13 +1715,16 @@ static void scan_db() {
 					case'\'':
 						if (qqb(L"<''")) c = out.length();//<''ignore>...
 						else if (qqb(L"<'")) { //<'comments>
-							if (qq[2] == '>') wcout << vstrand.at(found_io - 1).in << '\n'; else //<'>
-							if (show_strand) {
-								if (qq[2] != ' ') {
-									wstring v = qq.substr(2, qq.find('>') - 2);
-									showOutsMsg(L"", v, L"", 1);
-									cout << '\n';
-								}
+							if (qq[2] == '>') { //<'>
+								wcout << vstrand.at(found_io - 1).in;
+								if (vstrand.at(found_io - 1).in[0] != '<')
+									wcout << vstrand.at(found_io - 1).g;
+								cout << '\n';
+							}
+							else if (show_strand && qq[2] != ' ') {
+								wstring v = qq.substr(2, qq.find('>') - 2);
+								showOutsMsg(L"", v, L"", 1);
+								cout << '\n';
 							}
 							rei();
 							out_sleep = 0;
@@ -1798,16 +1802,15 @@ static void scan_db() {
 						switch (qq[2]) {
 						case 'B':
 						case 'b':
-							if (testqqb(L"<DB:") || testqqb(L"<db:")) {//.h Database:
-								if (qq[1] == 'D') showOutsMsg(L"", qp, L"\n", 0);
+							if (testqqb(L"<db:")) {//.h Database:
 								qp = regex_replace(qp, wregex(L"/"), L"\\");
 								wifstream f(qp); if (!f) { f.close(); showOutsMsg(L"", L"\\n\\4Database \\7\\0C\\" + qp + L"\\0C\\\\4 not found!\\7\\n", L"", 1); return; } f.close();
 								rei();
 								//append db
-								wstring t = database;
+								wstring _ = database;
 								database = qp;
 								make_vdb_table();
-								database = t;
+								database = _;
 								break;
 							}
 							else if (qqb(L"<db>") || qqb(L"<DB>")) {
@@ -2622,14 +2625,14 @@ static void scan_db() {
 						case 'E':
 						case 'e':
 							if (testqqb(L"<SE:") || testqqb(L"<se:")) {//.h Switch Settings: file
-								if (qq[1] == 'S') showOutsMsg(L"", qp, L"\n", 0);
 								qp = regex_replace(qp, wregex(L"/"), L"\\");
 								wifstream f(qp); if (!f) { f.close(); showOutsMsg(L"", L"\\n\\4Settings \\7\\0C\\" + qp + L"\\0C\\\\4 not found!\\7\\n", L"", 1); return; } f.close();
+								wstring t = settings, _ = database;
 								settings = qp;
-								se = settings.substr(settings.find_last_of('\\') + 1) + L" - ";
-								wstring db_ = database;
+								if (qq[1] == 's') se = settings.substr(settings.find_last_of('\\') + 1) + L" - ";
 								load_settings();
-								if (db_ != database)
+								if (qq[1] == 'S') settings = t;
+								if (_ != database)
 									mvdb = 1;
 								rei();
 								break;
