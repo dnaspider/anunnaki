@@ -42,6 +42,7 @@ wstring qq = L"", qp = L"", qx = L"", qy = L"";
 wstring repeats = L"";
 wstring Loop_Insert_Text = L"";
 wstring out = L"";
+wstring chk = L"";
 string delimiter = "\n"; //°";
 vector<Strand> vstrand{};
 vector<Strand_out> vstrand_out{};
@@ -170,7 +171,7 @@ static void make_vdb_table() {
 		s_o.out.clear();
 		
 		s.in = cell.substr(0, cell.find_first_of(L" -:>"));
-		if (s.in[s.in.length() - 1] == '\\' && delimiter[0] == '\n') { //multi_line
+		if (s.in[0] && s.in[s.in.length() - 1] == '\\' && delimiter[0] == '\n') { //multi_line
 			multi_line = 1;
 			s.in.pop_back();
 			cells = wstring_to_utf8(s.in) + cells.substr(s.in.length() + 1);
@@ -850,15 +851,11 @@ static void sleep(unsigned long ms) {
 }
 
 static void kb_press(wstring s, short key) {
-	qx = qq.substr(0, qq.find('>', 1) + 1);
-	qx = qx.substr(s.length());
-	qx = qx.substr(0, qx.length() - (qx[qx.length() - 1] == '>'));
-	if (qx[0] == ' ') qx = qx.substr(1);
-	if (!qx[0]) qx = L"1";
-	if (check_if_num(qx, L"<key #>") == L"") { //if (qx[0] < '0' || qx[0] > '9')
+	if (!qp[0]) qp = L"1";
+	if (check_if_num(qp, L"<key #>") == L"") { //if (qx[0] < '0' || qx[0] > '9')
 		printq(); rei(); return;
 	}
-	unsigned short x = stoi(qx);
+	unsigned short x = stoi(qp);
 
 	INPUT ip[2]{};
 	ip[0].type = INPUT_KEYBOARD;
@@ -919,7 +916,7 @@ static void setQxQy(wstring x) {
 	else if (x.find(',') != string::npos) //<xy:#,#>
 		q = x.find(',');
 	else {
-		if (qx[0]) { qx.clear(), qy.clear(); }
+		if (qx[0]) { qx = L"", qy = L""; }
 		return;
 	}
 	qx = x.substr(0, q);
@@ -1083,7 +1080,7 @@ static wstring connect(wstring& w, bool bg = 0) {
 }
 
 static bool qqb(const wstring s) {
-	return qq.substr(0, s.length()) == s && qq.find('>') != string::npos;
+	return s == chk.substr(0, chk.find(' ')) || s + L">" == chk;
 }
 
 static bool testqqb(const wstring s) {
@@ -1155,7 +1152,7 @@ Mouse event
 <su>		UP
 <sr>		RIGHT
 <sd>		DOWN
-<test:><xy: 0 0><lc2>
+<test:><xy: 0 0><lc 2>
 
 Window controls:
 <ifapp:>	If app is open
@@ -1252,7 +1249,7 @@ Keyboard
 <pause>
 <caps>
 <menu>
-<win1>
+<win 1>
 
 in <shift><left3><shift-><ctrl>x<ctrl->
 
@@ -1561,17 +1558,40 @@ static void scan_db() {
 						}
 					}
 
-					if (qq.substr(0, qq.find('>')).find(':') != std::string::npos) { //<test:#>
-						qp = qq.substr(qq.find(':') + 1, qq.find('>') - qq.find(':') - 1); //#
-						if (qp[0]) {
-							if (qp[0] == ' ') qp = qp.substr(1);
-							setQxQy(qp);
+
+					if (qq.find('>') != string::npos) {
+						chk = L"";
+						qp = L"";
+						for (auto x : L":', "s) {
+							if (qq.substr(0, qq.find('>')).find(x) != std::string::npos) { //<test:#>
+								chk = qq.substr(0, qq.find(x) + 1);
+								qp = qq.substr(qq.find(x) + 1, qq.find('>') - qq.find(x) - 1); //#
+								if (qp[0]) {
+									if (qp[0] == ' ') qp = qp.substr(1);
+									setQxQy(qp);
+								}
+								else {
+									qx = L"";
+									qy = L"";
+								}
+								break;
+							}
 						}
+						if (!chk[0]) chk = qq.substr(0, qq.find('>') + 1);
 					}
+					else {
+						qp = L"";
+						qx = L"";
+						qy = L"";
+						printq();
+						continue;
+					}
+
+
+
 					switch (qq[1]) {
-					case '<':
 					case ':':
-						if (testqqb(L"<:") || testqqb(L"<<:")) { //cout
+						if (testqqb(L"<:")) { //cout
 							showOutsMsg(L"", qp, L"", 1);
 							rei();
 							break;
@@ -1690,40 +1710,35 @@ static void scan_db() {
 						break;
 					case ',':
 						if (qqb(L"<,") && qq[2] != ':' && qq[2] != '-') { //<,#>
-							qx = qq.substr(2);
-							qx = qx.substr(0, qx.find('>'));
-							unsigned long n = 1;
-							if (qx.find(' ') != string::npos) {
-								setQxQy(qx);
+							unsigned long n = 1, ms;
+							if (qy[0]) { //<,1000 4>
 								if (check_if_num(qy, L"<,# #>") == L"") return;
-								n = stoul(qy); //<,1000 4>
+								n = stoul(qy);
+								if (check_if_num(qx, L"<,#>") == L"" || n == 0) return;
+								ms = stoul(qx);
 							}
-							if (!qx[0]) qx = to_wstring(frequency); //default <,>
-							//if (qx[0] < '0' || qx[0] > '9' || n == 0) { //<,1000>
-							if (check_if_num(qx, L"<,#>") == L"" || n == 0) { //<,1000>
-								rei(); return;
+							else { //<,1000>
+								if (!qp[0]) ms = frequency; //default <,>
+								else if (check_if_num(qp, L"<,#>") == L"") return;
+								else ms = stoul(qp);
 							}
-
-							unsigned long ms = stoul(qx);
 
 							multi_sleep(multi_, ms, n);
-
 							rei();
 						}
 						else connect(out);
 						break;
 					case'\'':
-						if (qqb(L"<''")) c = out.length();//<''ignore>...
-						else if (qqb(L"<'")) { //<'comments>
-							if (qq[2] == '>') { //<'>
+						if (qqb(L"<'")) { //<'comments>
+							if (qq[2] == '\'') { c = out.length(); break; }//<''ignore>...
+							else if (qq[2] == '>') { //<'>
 								wcout << vstrand.at(found_io - 1).in;
 								if (vstrand.at(found_io - 1).in[0] != '<')
 									wcout << vstrand.at(found_io - 1).g;
 								cout << '\n';
 							}
-							else if (show_strand && qq[2] != ' ') {
-								wstring v = qq.substr(2, qq.find('>') - 2);
-								showOutsMsg(L"", v, L"", 1);
+							else if (qq[2] != ' ' && show_strand) {
+								showOutsMsg(L"", qp, L"", 1);
 								cout << '\n';
 							}
 							rei();
@@ -1917,11 +1932,25 @@ static void scan_db() {
 					case'i':
 						switch (qq[2]) {
 						case 'f':
-							if (testqqb(L"<ifapp") || testqqb(L"<ifApp") //app activate, if App in foreground
-								|| testqqb(L"<ifrgb")
-								|| testqqb(L"<ifxy")
-								|| testqqb(L"<ifcb")
-								) {
+							{
+							bool _{};
+							{
+								wstring cmd{ qq.substr(3, qq.find(':') - 2) };
+
+								switch (qq[3]) {
+								case 'a':
+									if (cmd == L"app~:" || cmd == L"app:" || cmd == L"App:") _ = 1;
+									break;
+								case 'r':
+									if (cmd == L"rgb~:" || cmd == L"rgb:") _ = 1;
+									break;
+								case 'x': //testqqb(L"<ifxy") || testqqb(L"<ifcb")
+								case 'c':
+									if (qp[0] && chk == qq.substr(0, chk.length())) _ = 1;
+									break;
+								}
+							}
+							if (_) {
 #pragma region ifinit
 								if (!qp[0]) { connect(out); break; }
 
@@ -2380,7 +2409,8 @@ static void scan_db() {
 								multi_.br_ = 0;
 
 							}
-							else if (testqqb(L"<if+")) {//<if+:> | stop if <+>
+							//testqqb(L"<if+")
+							else if (qp[0] && chk == qq.substr(0, chk.length())) {//<if+:> | stop if <+>
 								wstring x = qp.substr(0, qp.find(' '));
 								if (check_if_num(x) == L"" || !qp[0]) { connect(out); break; }
 
@@ -2417,6 +2447,8 @@ static void scan_db() {
 								}
 								if (b) {
 									if (l > L"") {
+										if (l == L"<") { out = out.substr(out.find('>') + 1); }
+										else
 										out = l[0] == '<'
 											? l + L">" + qq.substr(qq.find('>') + 1)
 											: L"<" + l + L">";//<if+:# true->
@@ -2428,6 +2460,7 @@ static void scan_db() {
 								else rei();
 							}
 							else connect(out);
+							}
 							break;
 						case 'n':
 							if (qqb(L"<ins")) kb_press(L"<ins", VK_INSERT);
@@ -2768,10 +2801,19 @@ static void scan_db() {
 								qu = regex_replace(qu, wregex(L"\\\\n"), L"\n");
 							}
 
+							multi_.out_ = out;
+							multi_.qq_ = qq;
+							multi_.qp_ = qp;
+							multi_.c_ = c;
+
 							int m = MessageBoxW(0, me.c_str()
 								, qu.c_str()
 								, MB_YESNO);
 							if (m == IDYES) {
+								out = multi_.out_;
+								qq = multi_.qq_;
+								qp = multi_.qp_;
+								c = multi_.c_;
 								rei();
 								continue;
 							}
@@ -3398,7 +3440,7 @@ int main() {
 					if (GetAsyncKeyState('1') || GetAsyncKeyState(VK_NUMPAD1)) { num = 1; break; }
 				}
 				if (num) {
-					db_ = LR"(<anu\ ><:\R\n
+					db_ = LR"(<anu\:><:\R\n
          /    \ \n
     __ // \  / \\\ __\n
    / / \\\  \/  // \ \ \n
