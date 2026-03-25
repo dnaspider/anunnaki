@@ -47,7 +47,7 @@ string delimiter = "\n"; //°";
 vector<Strand> vstrand{};
 vector<Strand_out> vstrand_out{};
 size_t c = 0;
-size_t found_io = 0, found_io_repeat = 0;
+size_t found_io = 0, found_io_repeat = 0, follow = 0;
 double RgbScaleLayout = 1.00; //100%
 double ic = 0; //<+> icp
 int qxcc = 0, qycc = 0;
@@ -1058,9 +1058,13 @@ static wstring connect(wstring& w, bool bg = 0) {
 	}
 
 	if (con) {
+		bool x{};
+		if (!follow) { follow = found_io; x = 1; }
+
 		wstring o = get_out(qqs);
 		
 		if (o[0]) {
+			if (x) o += L"<@:>"; //follow
 			if (bg) return replacerDb[0] ? is_replacer(o) : o;
 			
 			w = o + qq.substr(qqs.length());
@@ -1457,6 +1461,7 @@ static void scan_db() {
 
 	if (repeats[0] != '>') found_io_repeat = 0;
 	found_io = 0;
+	follow = 0;
 	stop = 0;
 	bool fallthrough_ = 0;
 
@@ -1554,11 +1559,11 @@ static void scan_db() {
 						qp = L"";
 						for (auto x : L":', "s) {
 							if (qq.substr(0, qq.find('>')).find(x) != std::string::npos) { //<test:#>
-								chk = qq.substr(0, qq.find(x) + 1);
+								chk = qq.substr(0, qq.find(x) + 1); //<test:
 								qp = qq.substr(qq.find(x) + 1, qq.find('>') - qq.find(x) - 1); //#
 								if (qp[0]) {
 									if (qp[0] == ' ') qp = qp.substr(1);
-									setQxQy(qp);
+									setQxQy(qp); //# #
 								}
 								else {
 									qx = L"";
@@ -1567,7 +1572,7 @@ static void scan_db() {
 								break;
 							}
 						}
-						if (!chk[0]) chk = qq.substr(0, qq.find('>') + 1);
+						if (!chk[0]) chk = qq.substr(0, qq.find('>') + 1); //<test:>
 					}
 					else {
 						qp = L"";
@@ -1578,6 +1583,12 @@ static void scan_db() {
 					}
 
 					switch (qq[1]) {
+					case '@': //<@:> follow
+						found_io = found_io_repeat;
+						follow = 0;
+						if (out_speed > 0) out_sleep = 0;
+						rei();
+						break;
 					case ':':
 						if (qqb(L"<:")) { //cout
 							showOutsMsg(L"", qp, L"", 1);
@@ -1739,8 +1750,8 @@ static void scan_db() {
 					case 'A':
 						switch (qq[2]) {
 						case 'l':
-							if (qqb(L"<alt>")) { kb_hold(VK_LMENU); rei(); }
-							else if (qqb(L"<alt->")) { kb_release(VK_LMENU); rei(); }
+							if (qqb(L"<alt>")) { if (out_speed > 0) out_sleep = 0; kb_hold(VK_LMENU); rei(); }
+							else if (qqb(L"<alt->")) { if (out_speed > 0) out_sleep = 0; kb_release(VK_LMENU); rei(); }
 							else if (qqb(L"<alt")) kb_press(L"<alt", VK_LMENU);
 							else connect(out);
 							break;
@@ -1774,8 +1785,8 @@ static void scan_db() {
 							else connect(out);
 							break;
 						case 't':
-							if (qqb(L"<ctrl>")) { kb_hold(VK_CONTROL); rei(); }
-							else if (qqb(L"<ctrl->")) { kb_release(VK_CONTROL); rei(); }
+							if (qqb(L"<ctrl>")) { if (out_speed > 0) out_sleep = 0; kb_hold(VK_CONTROL); rei(); }
+							else if (qqb(L"<ctrl->")) { if (out_speed > 0) out_sleep = 0; kb_release(VK_CONTROL); rei(); }
 							else if (qqb(L"<ctrl")) kb_press(L"<ctrl", VK_CONTROL);
 							else connect(out);
 							break;
@@ -2668,17 +2679,15 @@ static void scan_db() {
 							else connect(out);
 							break;
 						case 'h':
-							if (qqb(L"<shift>")) { kb_hold(VK_LSHIFT); rei(); }
-							else if (qqb(L"<shift->")) { kb_release(VK_LSHIFT); kb_release(VK_RSHIFT); rei(); }
+							if (qqb(L"<shift>")) { if (out_speed > 0) out_sleep = 0; kb_hold(VK_LSHIFT); rei(); }
+							else if (qqb(L"<shift->")) { if (out_speed > 0) out_sleep = 0; kb_release(VK_LSHIFT); kb_release(VK_RSHIFT); rei(); }
 							else if (qqb(L"<shift")) kb_press(L"<shift", VK_LSHIFT);
 							else connect(out);
 							break;
 						case 'p':
 							if (qqb(L"<speed:")) {
 								if (check_if_num(qp, L"<speed: {slot}>") != L"") {
-									wstring n = qp;
-									if (n[0] == ' ') n = n.substr(1);
-									out_speed = stoi(n); rei(); out_sleep = 0;
+									out_speed = stoi(qp); rei(); out_sleep = 0;
 								}
 								else printq();
 							}
@@ -2726,15 +2735,15 @@ static void scan_db() {
 						else connect(out);
 						break;
 					case 'w':
-						if (qqb(L"<win>")) { kb_hold(VK_LWIN); rei(); }
-						else if (qqb(L"<win->")) { kb_release(VK_LWIN); rei(); }
+						if (qqb(L"<win>")) { if (out_speed > 0) out_sleep = 0; kb_hold(VK_LWIN); rei(); }
+						else if (qqb(L"<win->")) { if (out_speed > 0) out_sleep = 0; kb_release(VK_LWIN); rei(); }
 						else if (qqb(L"<win")) kb_press(L"<win", VK_LWIN);
 						else connect(out);
 						break;
 					case 'x':
 						switch (qq[2]) {
 						case 'y':
-							if (qqb(L"<xy:") || qqb(L"<xy~:")) {
+							if (qx[0] && (qqb(L"<xy:") || qqb(L"<xy~:"))) {
 								if (delimiter[0] != '\n' && qx[0] == '\n' || qx[0] == '\t' || qy[0] == '\n' || qy[0] == '\t') {
 									qx = regex_replace(qx, wregex(L"\n"), L""); qx = regex_replace(qx, wregex(L"\t"), L"");
 									qy = regex_replace(qy, wregex(L"\n"), L""); qy = regex_replace(qy, wregex(L"\t"), L"");
