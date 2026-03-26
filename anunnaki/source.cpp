@@ -1245,9 +1245,9 @@ Keyboard
 <pause>
 <caps>
 <menu>
-<win 1>
+<win 1>		Multi press
 
-in <shift><left3><shift-><ctrl>x<ctrl->
+in <shift><left 3><shift-><ctrl>x<ctrl->
 
 Sleep
 <,>		160 milliseconds
