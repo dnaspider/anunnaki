@@ -851,9 +851,10 @@ static void sleep(unsigned long ms) {
 }
 
 static void kb_press(wstring s, short key) {
-	if (!qp[0]) qp = L"1";
-	if (check_if_num(qp, L"<key #>") == L"") { //if (qp[0] < '0' || qp[0] > '9' || )
-		printq(); rei(); return;
+	if (!qp[0])
+		qp = L"1";
+	else if (check_if_num(qp, L"<key #>") == L"") { //if (qp[0] < '0' || qp[0] > '9' || )
+		printq(); return;
 	}
 	
 	INPUT ip[2]{};
@@ -864,6 +865,9 @@ static void kb_press(wstring s, short key) {
 	ip[1].ki.dwFlags = 2;
 
 	unsigned x = stoul(qp);
+	//if (to_wstring(x).length() != qp.length()) {
+	//	printq(); return;
+	//}
 	for (unsigned j = 0; j < x; ++j) {
 		if (GetAsyncKeyState(VK_ESCAPE))
 			return;
@@ -1290,7 +1294,9 @@ Syntax		Use either & or | (optional)
 <ifcblen:>	Length
 
 <ifxy:>		Same logical options
+<if+:>		If counter
 
+<+>	Counter (e.g., <+:1> or <*:0>)
 <xy>	Type
 <rgb>
 <app>	Cb
@@ -1310,8 +1316,8 @@ Manual controls:
 <!#!in:>	With sanity check
 
 Misc.
-Use \\\\g for > in <ifapp:>. Everywhere else \g
-Other: \, \| \&
+Use \\\\g for > in <ifapp:>
+Other: \g \, \| \&
 
 CTRL+S inside
 [EditorDb] to rebuild [Database]
@@ -1319,10 +1325,8 @@ CTRL+S inside
 
 [Debug 2] Assume
 
-External:
-Use legacy terminal: WIN + "Terminal settings" > Windows Console Host
-VS Code: "[plaintext]": { "editor.insertSpaces": false,
-)";
+VS Code: "[plaintext]": { "editor.insertSpaces": false, "editor.detectIndentation": false
+)"; //Use legacy terminal: WIN + "Terminal settings" > Windows Console Host
 
 }
 
@@ -1938,6 +1942,7 @@ static void scan_db() {
 
 								switch (qq[3]) {
 								case 'a':
+								case 'A':
 									if (cmd == L"app~:" || cmd == L"app:" || cmd == L"App:") _ = 1;
 									break;
 								case 'r':
@@ -3441,7 +3446,7 @@ int main() {
     __ // \  / \\\ __\n
    / / \\\  \/  // \ \ \n
   / /   \7ANUNNAKi\R   \ \ \n
-  \ \\   // \7.8\R \\\   / /\n
+  \ \\   // \7.9\R \\\   / /\n
    \_\ //  /\  \\\ /_/\n
        \\\\ /  \ //\n
          \    /\n\n
