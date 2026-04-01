@@ -1249,6 +1249,12 @@ Keyboard
 <pause>
 <caps>
 <menu>
+<pause>
+<ins>
+<pu>
+<pd>
+<ps>
+<f12>
 <win 1>		Multi press
 
 in <shift><left 3><shift-><ctrl>x<ctrl->
@@ -1261,8 +1267,8 @@ Sleep
 Output speed
 <speed:160>
 
-Message box. Options: \SPACE \g \n
-<yesno: title continue?>
+Message box
+<yesno: Title\ here Continue\n?>
 
 Replace cb
 <replace:(\r\n) x$1>
@@ -1274,7 +1280,6 @@ Set se.txt [ReplacerDb c:\anu\db.txt] for replacer ability
 te {x:}
 x:1
 
-Audio:
 <Audio: c:\anu\fx.wav>
 <audio: play c:\anu\fx.mp3>
 
@@ -1286,7 +1291,7 @@ Syntax		Use either & or | (optional)
 <ifrgb~: 'r g b x y & r g b x y, *, ms n, t: f:'>
 
 <ifcb:>		Options:
-<ifcble:>	== != < <= g g= (logical)
+<ifcb!=:>	== != < <= g g= (logical)
 <ifcbf:>	Regex find
 <ifcbF:>	Find
 <ifcbS:>	Starts with
@@ -1296,17 +1301,23 @@ Syntax		Use either & or | (optional)
 <ifxy:>		Same logical options
 <if+:>		If counter
 
-<+>	Counter (e.g., <+:1> or <*:0>)
-<xy>	Type
-<rgb>
-<app>	Cb
-<cb>	Paste
-<cb:>	Set
+<+>	Counter
+<+:1>	Use + - * / %
+<+: 1>	Use space for cb counter
 
 Manual controls:
 <!:>	Set input; return
 <!!:>	Set repeat
 <!!!:>	Detach run
+
+<app>	To cb
+<xy>	Out
+<rgb>
+<time>
+<time:>
+
+<cb>	Paste
+<cb:>	Set
 
 <db> algos:
 <in:>		Scan db from top to bottom
