@@ -2237,7 +2237,7 @@ static void scan_db() {
 												COLORREF color;
 												HDC hDC;
 												hDC = GetDC(NULL);
-												if (X[0]) { color = GetPixel(hDC, int(stoi(X) * RgbScaleLayout), int(stoi(Y) * RgbScaleLayout)); }
+												if (X[0] && Y[0]) { color = GetPixel(hDC, int(stoi(X) * RgbScaleLayout), int(stoi(Y) * RgbScaleLayout)); }
 												else { POINT pt; GetCursorPos(&pt); color = GetPixel(hDC, int(pt.x * RgbScaleLayout), int(pt.y * RgbScaleLayout)); }
 												ReleaseDC(NULL, hDC);
 												if (color != CLR_INVALID
@@ -2398,8 +2398,10 @@ static void scan_db() {
 
 								if (stop) { stop = 0; c = out.length(); break; }
 
-								if (qq[3] == 'r' && qq[6] == '~' && multi_.br_ && !stop && X[0] && Y[0])
+								if (qq[3] == 'r' && qq[6] == '~' && multi_.br_ && !stop && X[0] && Y[0]) {
+									POINT pt; GetCursorPos(&pt); qxcc = pt.x; qycc = pt.y;
 									SetCursorPos(stoi(X), stoi(Y));
+								}
 
 								if (tf_T[0] || tf_F[0] || tf[0] && !tf_F[0]) {
 									if (tf_T_continue && multi_.br_ || tf_F_continue && !multi_.br_ || tf_loop) { rei(); break; }
