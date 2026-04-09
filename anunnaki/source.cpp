@@ -965,6 +965,9 @@ static wstring get_out(wstring q) {
 
 		n = found_io < vstrand.size() ? found_io : n;
 
+		if (b == L"<>") //!
+			return vstrand_out.at(n).out;
+
 		for (; n != found_io - 1; ++n) { //<!x:>
 			if (vstrand.at(n).in == b && vstrand.at(n).g == g) {
 				found_io = n + 1;
@@ -981,6 +984,9 @@ static wstring get_out(wstring q) {
 			n = found_io == vstrand.size() ? vstrand.size() - 2 : found_io - 2;
 
 		b = L"<" + q.substr(2);
+
+		if (b == L"<>") //^
+			return vstrand_out.at(n).out;
 
 		for (; n != found_io - 1; --n) { //<^b:>
 			if (vstrand.at(n).in == b && vstrand.at(n).g == g) {
@@ -1562,8 +1568,8 @@ static void scan_db() {
 				case '<':
 					qq = out.substr(c, out.length() - c); //<test>
 					
-					if (out[c + 1] == '!' || out[c + 1] == '^') { //<!x:> or <^x:> scan
-						if (out[c + 2] != '!' && out[c + 2] != ':' || out[c + 1] == '^') {
+					if (qq[1] == '!' || qq[1] == '^') { //<!x:> or <^x:> scan
+						if (qq[2] != '!' && qq[2] != ':' || qq[1] == '^') {
 							connect(out);
 							break;
 						}
@@ -1572,21 +1578,30 @@ static void scan_db() {
 					if (qq.find('>') != string::npos) {
 						chk = L"";
 						qp = L"";
-						for (auto x : L":', "s) {
-							if (qq.substr(0, qq.find('>')).find(x) != std::string::npos) { //<test:#>
-								chk = qq.substr(0, qq.find(x) + 1); //<test:
-								qp = qq.substr(qq.find(x) + 1, qq.find('>') - qq.find(x) - 1); //#
-								if (qp[0]) {
-									if (qp[0] == ' ') qp = qp.substr(1);
-									setQxQy(qp); //# #
+
+						if (qq[1] == ':' || qq[1] == '\'' || qq[1] == ',') {
+							chk = qq.substr(0, qq.find(qq[1]) + 1); //<test:
+							qp = qq.substr(qq.find(qq[1]) + 1, qq.find('>') - qq.find(qq[1]) - 1); //#
+						}
+						else {
+							for (auto x : L": "s) {
+								if (qq.substr(0, qq.find('>')).find(x) != std::string::npos) { //<test:#>
+									chk = qq.substr(0, qq.find(x) + 1); //<test:
+									qp = qq.substr(qq.find(x) + 1, qq.find('>') - qq.find(x) - 1); //#
+									break;
 								}
-								else {
-									qx = L"";
-									qy = L"";
-								}
-								break;
 							}
 						}
+
+						if (qp[0]) {
+							if (qp[0] == ' ') qp = qp.substr(1);
+							setQxQy(qp); //# #
+						}
+						else {
+							qx = L"";
+							qy = L"";
+						}
+
 						if (!chk[0]) chk = qq.substr(0, qq.find('>') + 1); //<test:>
 					}
 					else {
