@@ -1575,19 +1575,19 @@ static void scan_db() {
 						}
 					}
 
-					if (qq.find('>') != string::npos) {
+					if (auto f = qq.find('>'); f != string::npos) {
 						chk = L"";
 						qp = L"";
-
-						if (qq[1] == ':' || qq[1] == '\'' || qq[1] == ',') {
-							chk = qq.substr(0, qq.find(qq[1]) + 1); //<test:
-							qp = qq.substr(qq.find(qq[1]) + 1, qq.find('>') - qq.find(qq[1]) - 1); //#
+						
+						if (qq[1] == ':' || qq[1] == '\'' || qq[1] == ',') { //<:> <'> <,>
+							chk = qq.substr(0, 2); //<:
+							qp = qq.substr(2, f - 2); //#
 						}
 						else {
 							for (auto x : L": "s) {
-								if (qq.substr(0, qq.find('>')).find(x) != std::string::npos) { //<test:#>
+								if (qq.substr(0, f).find(x) != std::string::npos) { //<test:#>
 									chk = qq.substr(0, qq.find(x) + 1); //<test:
-									qp = qq.substr(qq.find(x) + 1, qq.find('>') - qq.find(x) - 1); //#
+									qp = qq.substr(chk.length(), f - chk.length()); //#
 									break;
 								}
 							}
@@ -1602,7 +1602,7 @@ static void scan_db() {
 							qy = L"";
 						}
 
-						if (!chk[0]) chk = qq.substr(0, qq.find('>') + 1); //<test:>
+						if (!chk[0]) chk = qq.substr(0, f + 1); //<test:>
 					}
 					else {
 						qp = L"";
