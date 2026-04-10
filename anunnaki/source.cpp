@@ -1585,7 +1585,7 @@ static void scan_db() {
 						}
 						else {
 							for (auto x : L": "s) {
-								if (qq.substr(0, f).find(x) != std::string::npos) { //<test:#>
+								if (qq.substr(0, f).find(x) != std::string::npos) { //<test:#> <test #>
 									chk = qq.substr(0, qq.find(x) + 1); //<test:
 									qp = qq.substr(chk.length(), f - chk.length()); //#
 									break;
@@ -1593,21 +1593,12 @@ static void scan_db() {
 							}
 						}
 
-						if (qp[0]) {
-							if (qp[0] == ' ') qp = qp.substr(1);
-							setQxQy(qp); //# #
-						}
-						else {
-							qx = L"";
-							qy = L"";
-						}
+						if (qp[0] == ' ') qp = qp.substr(1);
 
 						if (!chk[0]) chk = qq.substr(0, f + 1); //<test:>
 					}
 					else {
 						qp = L"";
-						qx = L"";
-						qy = L"";
 						printq();
 						continue;
 					}
@@ -1629,7 +1620,7 @@ static void scan_db() {
 						break;
 					case '#':
 						if (qqb(L"<#:")) { //ascii_calc
-							if (qp.find('\\') != string::npos) qp = regex_replace(qx, wregex(L"\\\\g"), L">");
+							if (qp.find('\\') != string::npos) qp = regex_replace(qp, wregex(L"\\\\g"), L">");
 							int s{}; for (auto& x : qp) s += x;
 							auto q = to_wstring(s);	cbSet(q);
 							rei();
@@ -1740,6 +1731,7 @@ static void scan_db() {
 					case ',':
 						if (qqb(L"<,")) { //<,#>
 							unsigned long n = 1, ms;
+							setQxQy(qp); //# #
 							if (qy[0]) { //<,1000 4>
 								if (check_if_num(qy, L"<,# #>") == L"") return;
 								n = stoul(qy);
@@ -2661,6 +2653,7 @@ static void scan_db() {
 						case 'e':
 							if (qqb(L"<replace:")) {
 								if (cbGet() > L"") {
+									setQxQy(qp);
 									if (qp.find(L"\\,") != wstring::npos) {// \,
 										wstring t = qp.substr(qp.find_last_of(L"\\") + 2);
 										if (t.find(',') != string::npos) {
@@ -2777,6 +2770,7 @@ static void scan_db() {
 						switch (qq[2]) {
 						case 'y':
 							if (qx[0] && (qqb(L"<xy:") || qqb(L"<xy~:"))) {
+								setQxQy(qp); //# #
 								if (delimiter[0] != '\n' && qx[0] == '\n' || qx[0] == '\t' || qy[0] == '\n' || qy[0] == '\t') {
 									qx = regex_replace(qx, wregex(L"\n"), L""); qx = regex_replace(qx, wregex(L"\t"), L"");
 									qy = regex_replace(qy, wregex(L"\n"), L""); qy = regex_replace(qy, wregex(L"\t"), L"");
