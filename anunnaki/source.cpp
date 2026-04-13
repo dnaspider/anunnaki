@@ -1584,12 +1584,13 @@ static void scan_db() {
 							qp = qq.substr(2, f - 2); //#
 						}
 						else {
-							for (auto x : L": "s) {
-								if (qq.substr(0, f).find(x) != std::string::npos) { //<test:#> <test #>
-									chk = qq.substr(0, qq.find(x) + 1); //<test:
-									qp = qq.substr(chk.length(), f - chk.length()); //#
-									break;
-								}
+							if (qq.substr(0, f).find(':') != std::string::npos) { //<test:#>
+								chk = qq.substr(0, qq.find(':') + 1); //<test:
+								qp = qq.substr(chk.length(), f - chk.length()); //#
+							}
+							else if (qq.substr(0, f).find(' ') != std::string::npos) { //<test #>
+								chk = qq.substr(0, qq.find(' ') + 1); //<test:
+								qp = qq.substr(chk.length(), f - chk.length()); //#
 							}
 						}
 
