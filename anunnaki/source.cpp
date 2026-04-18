@@ -2770,7 +2770,7 @@ static void scan_db() {
 					case 'x':
 						switch (qq[2]) {
 						case 'y':
-							if (qx[0] && (qqb(L"<xy:") || qqb(L"<xy~:"))) {
+							if (qqb(L"<xy:") || qqb(L"<xy~:")) {
 								setQxQy(qp); //# #
 								if (delimiter[0] != '\n' && qx[0] == '\n' || qx[0] == '\t' || qy[0] == '\n' || qy[0] == '\t') {
 									qx = regex_replace(qx, wregex(L"\n"), L""); qx = regex_replace(qx, wregex(L"\t"), L"");
