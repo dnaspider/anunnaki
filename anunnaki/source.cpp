@@ -3080,7 +3080,7 @@ static LRESULT CALLBACK LowLevelKeyboardProc(int nCode, WPARAM wParam, LPARAM lP
 
 					prints();
 				}
-					   return 0;
+					return 0;
 				case 29: { //Ctrl
 					if (cKey == 29) {
 						bool extended = (p->flags & LLKHF_EXTENDED) != 0;
@@ -3094,11 +3094,10 @@ static LRESULT CALLBACK LowLevelKeyboardProc(int nCode, WPARAM wParam, LPARAM lP
 					else
 						isCkey0Pressed = 1;
 				}
-					   return 0;
+					return 0;
 				}
 
-				if (isRshiftPressed && isLshiftPressed
-					|| isLshiftPressed || isRshiftPressed
+				if (isLshiftPressed || isRshiftPressed
 					|| isLctrlPressed || isRctrlPressed)
 					break;
 
@@ -3373,6 +3372,10 @@ static LRESULT CALLBACK LowLevelKeyboardProc(int nCode, WPARAM wParam, LPARAM lP
 								prints();
 								return 0;
 							}
+							isLshiftPressed = 0;
+							isRshiftPressed = 0;
+							isLctrlPressed = 0;
+							isRctrlPressed = 0;
 							breaker = 0;
 							return 0;
 						}
