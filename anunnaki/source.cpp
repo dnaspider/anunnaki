@@ -8,6 +8,7 @@
 #include <thread>
 
 using namespace std;
+using ctp = chrono::steady_clock::time_point;
 
 struct Strand
 {
@@ -48,6 +49,7 @@ vector<Strand> vstrand{};
 vector<Strand_out> vstrand_out{};
 size_t c = 0;
 size_t found_io = 0, found_io_repeat = 0, follow = 0;
+ctp c1{}, c2{}; //CtrlKey elapsed
 double RgbScaleLayout = 1.00; //100%
 double ic = 0; //<+> icp
 int qxcc = 0, qycc = 0;
@@ -55,14 +57,14 @@ unsigned short out_speed = 0;
 unsigned short frequency = 160;
 unsigned short strand_length = 2;
 unsigned short RSHIFTLSHIFT_Only = 0, rri = 0; //RSHIFTLSHIFT_Only 1 or 2 for L+ESC mode on; 2 for non <
-unsigned short cKey = 29, cKeyMax = 2; // Scan code for VK_RCONTROL
+unsigned short cKey = 29, cKeyMax = 700; // Scan code for VK_RCONTROL, CtrlKey elapsed
 unsigned short repeat_key = 70; // Scan code for VK_SCROLL;
 unsigned short PauseKey = 88; //Scan code for VK_F12
 unsigned short repeat_switch = 0;
 unsigned short debug = 0;
 unsigned short mvdb = 0; //make vstrand to
 
-unsigned short breaker{};
+unsigned short breaker{}, breaker_c{};
 unsigned short clear{};
 bool isWinKeyPressed{};
 bool isLshiftPressed{};
@@ -128,6 +130,10 @@ static std::string wstring_to_utf8(const std::wstring& wstr) {
 	std::string str(size_needed - 1, '\0');
 	WideCharToMultiByte(CP_UTF8, 0, wstr.c_str(), -1, &str[0], size_needed, nullptr, nullptr);
 	return str;
+}
+
+static ctp clockr(ctp& t) {
+	return t = chrono::high_resolution_clock::now();
 }
 
 static void make_vdb_table() {
@@ -650,10 +656,9 @@ static void load_settings() {
 			if (v.find(' ') != string::npos) {
 				wstring max = v.substr(v.find(' ') + 1); if (max.find(' ') != string::npos || max[0] == 0) { er(); break; }
 				v = v.substr(0, v.find(' '));
-				if (check_if_num(max, L"CtrlKey duration") == L"") { er(); break; }
-				cKeyMax = max == L"1" ? 2 : stoi(max);
+				if (check_if_num(max, L"CtrlKey duration (ms)") == L"") { er(); break; }
+				cKeyMax = stoi(max);
 			}
-			else cKeyMax = 2;
 			if (check_if_num(v, L"CtrlKey") == L"") { er(); break; }
 			cKey = stoi(v);
 		} break;
@@ -3038,7 +3043,7 @@ static LRESULT CALLBACK LowLevelKeyboardProc(int nCode, WPARAM wParam, LPARAM lP
 						return 0;
 					}
 				}
-				
+
 				if (pause || isWinKeyPressed || isCkey0Pressed) return 0; //cKey 0
 
 				if (debug == 1) printf("Virtual Key = %d, Scan Code = %d\n", p->vkCode, p->scanCode);
@@ -3075,7 +3080,7 @@ static LRESULT CALLBACK LowLevelKeyboardProc(int nCode, WPARAM wParam, LPARAM lP
 
 					prints();
 				}
-					return 0;
+					   return 0;
 				case 29: { //Ctrl
 					if (cKey == 29) {
 						bool extended = (p->flags & LLKHF_EXTENDED) != 0;
@@ -3083,13 +3088,13 @@ static LRESULT CALLBACK LowLevelKeyboardProc(int nCode, WPARAM wParam, LPARAM lP
 							isLctrlPressed = 1;
 						else {
 							isRctrlPressed = 1;
-							++breaker;
+							clockr(c1);
 						}
 					}
 					else
 						isCkey0Pressed = 1;
 				}
-					return 0;
+					   return 0;
 				}
 
 				if (isRshiftPressed && isLshiftPressed
@@ -3245,7 +3250,7 @@ static LRESULT CALLBACK LowLevelKeyboardProc(int nCode, WPARAM wParam, LPARAM lP
 				case 51: if (Kb_Key_Comma[0]) key(Kb_Key_Comma); return 0;
 				case 52: if (Kb_Key_Period[0]) key(Kb_Key_Period); return 0;
 				case 93: if (Kb_Key_Menu[0]) key(Kb_Key_Menu); return 0;
-				
+
 				case 69:
 				case 72:
 				case 75:
@@ -3307,11 +3312,11 @@ static LRESULT CALLBACK LowLevelKeyboardProc(int nCode, WPARAM wParam, LPARAM lP
 						return 1;
 					}
 				}
-					break;
+					   break;
 				case 76: if (Kb_Key_Numpad_5[0]) key(Kb_Key_Numpad_5); return 0;
 				case 74: if (Kb_Key_Numpad_Minus[0]) key(Kb_Key_Numpad_Minus); return 0;
 				case 78: if (Kb_Key_Numpad_Add[0]) key(Kb_Key_Numpad_Add); return 0;
-				
+
 				}
 			}
 				break;
@@ -3343,13 +3348,20 @@ static LRESULT CALLBACK LowLevelKeyboardProc(int nCode, WPARAM wParam, LPARAM lP
 							isLctrlPressed = 0;
 							GetAsyncKeyState(VK_RCONTROL); if (GetAsyncKeyState(VK_RCONTROL))
 								repeated = 1;
+							if (breaker > 1) repeated = 0;
 						}
 						else {
 							isRctrlPressed = 0;
 							if (repeated) break;
-							if (isRshiftPressed) { if (RSHIFTCtrlKeyToggle && breaker <= 2) rshift_rctrl = 1; break; }
+							
+							if (isRshiftPressed) { if (RSHIFTCtrlKeyToggle && breaker == 1) rshift_rctrl = 1; break; }
+							
+							clockr(c2);
+							chrono::duration<double, milli> ts = c1 - c2;
+							if (breaker == 1) { breaker_c = abs(static_cast<short>(ts.count())); } else ++breaker;
+
 							//cout << "breaker: " << breaker << "\n";
-							if (breaker <= cKeyMax && !isLctrlPressed && !isLshiftPressed) {
+							if (breaker == 1 && breaker_c <= cKeyMax && !isLctrlPressed && !isLshiftPressed) {
 								breaker = 0;
 								if (RSHIFTLSHIFT_Only && !strand[0] && !rri) return 0;
 								if (!strand[0]) strand = L"<";
@@ -3469,7 +3481,7 @@ int main() {
     __ // \  / \\\ __\n
    / / \\\  \/  // \ \ \n
   / /   \7ANUNNAKi\R   \ \ \n
-  \ \\   //\7.10\R \\\   / /\n
+  \ \\   //\7.11\R \\\   / /\n
    \_\ //  /\  \\\ /_/\n
        \\\\ /  \ //\n
          \    /\n\n
