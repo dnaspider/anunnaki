@@ -2241,16 +2241,19 @@ static void scan_db() {
 													if (!Y[0]) { Y = t; break; }
 												}
 
-												if (debug == 1) {
-													t = R + G + B + X + Y;
-													t = regex_replace(a, wregex(L"-"), L"");
-													if (check_if_num(t, L"CHECK RGBXY slot") != L"") { stop = 1; break; }
-												}
 
 												COLORREF color;
 												HDC hDC;
 												hDC = GetDC(NULL);
-												if (X[0] && Y[0]) { color = GetPixel(hDC, int(stoi(X) * RgbScaleLayout), int(stoi(Y) * RgbScaleLayout)); }
+
+												if (X[0] && Y[0]) {
+													if (X[0] == '.' || Y[0] == '.') {
+														POINT pt; GetCursorPos(&pt);
+														if (X[0] == '.') { X = to_wstring(pt.x); }
+														if (Y[0] == '.') { Y = to_wstring(pt.y); }
+													}
+													color = GetPixel(hDC, int(stoi(X) * RgbScaleLayout), int(stoi(Y) * RgbScaleLayout));
+												}
 												else { POINT pt; GetCursorPos(&pt); color = GetPixel(hDC, int(pt.x * RgbScaleLayout), int(pt.y * RgbScaleLayout)); }
 												ReleaseDC(NULL, hDC);
 												if (color != CLR_INVALID
@@ -2417,7 +2420,7 @@ static void scan_db() {
 								}
 
 								if (tf_T[0] || tf_F[0] || tf[0] && !tf_F[0]) {
-									if (tf_T_continue && multi_.br_ || tf_F_continue && !multi_.br_ || tf_loop) { rei(); break; }
+									if (tf_T_continue && multi_.br_ || tf_F_continue && !multi_.br_ || tf_loop) { rei(); multi_.br_ = 0; break; }
 									tf_T = multi_.br_ ? tf_T : tf_F;
 									if (!tf_F[0]) tf_T = tf;//single tf !tf_F[0] case
 									tf_T = tf_T + L">";
@@ -3484,7 +3487,7 @@ int main() {
     __ // \  / \\\ __\n
    / / \\\  \/  // \ \ \n
   / /   \7ANUNNAKi\R   \ \ \n
-  \ \\   //\7.11\R \\\   / /\n
+  \ \\   //\7.12\R \\\   / /\n
    \_\ //  /\  \\\ /_/\n
        \\\\ /  \ //\n
          \    /\n\n
