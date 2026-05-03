@@ -90,6 +90,9 @@ bool stop = 0, pause = 0;
 bool utf_8 = 1, u8{};
 bool ccm = 0; //close_ctrl_mode toggle
 
+bool fallthrough_{};
+bool clo{}; //clock
+
 #pragma endregion
 
 struct Multi_ {
@@ -368,9 +371,29 @@ static void showOutsMsg(wstring s, wstring w, wstring s1 = L"", bool make_color 
 				write(L">");
 				if (!make_color) ++x;
 				break;
-			//case 'i': //input
-			//{ if (make_color) write(vstrand.at(found_io - 1).in); }
-			//break;
+			case 'i': //input
+			if (make_color) {
+				Strand _ = vstrand.at(found_io - 1);
+				write(_.in);
+				if (_.in[0] != '<')
+					wcout << _.g;
+			}
+			break;
+			case ',': //clock
+				if (make_color) {
+					if (clo) {
+						clo = 0;
+						clockr(c2);
+						chrono::duration<double, milli> ts = c1 - c2;
+						write(to_wstring(abs(static_cast<long>(ts.count()))));
+					}
+					else {
+						clo = 1;
+						clockr(c1);
+						x += 2;
+					}
+				}
+				break;
 			}
 			if (t) continue;
 		}
@@ -948,7 +971,7 @@ static wstring get_out(wstring q) {
 			a = a.substr(0, a.find('!'));
 
 			if (check_if_num(a) != L"") {
-				n = stoi(a);
+				n = a[0] == '.' ? found_io : stoi(a); //<!.!> | <!#!>
 
 				if (n <= 0 || n > vstrand_out.size()) return L"";
 
@@ -1107,7 +1130,7 @@ H+ESC		Toggle visibility
 P+ESC		<xy:>
 A+ESC		<ifapp~:>
 R+ESC		<ifrgb:>
-L+ESC		Toggle [se.txt RSHIFT+LSHIFT_Only]
+L+ESC		Toggle se.txt [RSHIFT+LSHIFT_Only]
 G+ESC		RGBXY to clipboard (cb) in 3 sec.
 Set mouse pointer over target, press G+ESC, then move it away
 
@@ -1117,22 +1140,27 @@ i o		Use space or - for auto backspace input
 i-o
 i>o		Use > for remember input for [RepeatKey]
 
-i\>o		Use this format to ignore tabs and new lines
+i\>		Use this format to ignore tabs and newlines
+	o
 \
 
-<i:>o		Link
+<i:>o		Link. Use : or -
 i <i:>
 
 i		Fallthrough
 ii o
 
-Use RCTRL, F2, PAUSE, RSHIFT+LSHIFT, or COMMA+ESC after input to run
+Use RCTRL, F2, PAUSE, RSHIFT+LSHIFT, or COMMA+ESC after input to run (or to toggle < if no input)
 
-Repeat:
+Repeat
 Use SCROLL [RepeatKey 70], RCTRL+LCTRL, or EQUAL+ESC
 
-Clear input:
+Clear input
 Hold RSHIFT, Press LSHIFT three times
+
+Use <anu> to run its output when program starts
+
+Output:
 
 Settings
 <se>		Reload and show
@@ -1163,14 +1191,14 @@ Mouse event
 <su>		UP
 <sr>		RIGHT
 <sd>		DOWN
-<test:><xy: 0 0><lc 2>
+in <xy: 0 0><lc 2>
 
-Window controls:
-<ifapp:>	If app is open
+Window controls
+<ifapp:>	If app is open; continue
 <ifapp~:>	Use ~ to move app to foreground
 <ifApp:>	Use A to check if app window is in focus
 
-Syntax
+Full syntax
 <ifapp~: 'title | Title, *, ms n, t: f:'>
 
 Stop if false
@@ -1179,62 +1207,55 @@ Stop if false
 Loop. Check every 160ms
 <ifapp~: title,>
 
+Loop feedback message. Use ' (prepend to title)
+<ifapp~: '?'t,> (extended)
+
 Check 3 times. 3000ms delay
 <ifapp~: t, 3, 3000>
 
 Loop infinitely
-<ifapp~: t, 1, 1000,> or
-<ifapp~: t, 1, 1000, :> or - instead of :
+<ifapp~: 't, 1, 1000,>
 
-Link to false if false
+Link to <f:> if false
 <ifapp~: t, 1, 1, f:>
 <f:><'F>
 
-Open true false link slots with SPACE
+Link to <t:> if true (true false slot)
 <ifapp~: t, 1, 1, t: f:>
 <t:><'T>
 <f:><'F>
 
-Continue if true or false. Use <
-<ifapp~:t,1,1,< <>
-
-Loop feedback message. Use '
-<ifapp~:'?'t,1,1,<t: <f:> (extended)
-
 Link and continue. Use <
-<ifapp~:t, 1, 1, <t: <f:><'1>
+<ifapp~: t, 1, 1, <t: <f:><'1>
 
 Use , in false slot for retry
-<ifapp~:'t,1,1,<t: ,><:1>
+
+Options for true false slot
+<		Continue
+!		Link to output below
+^		Above
 
 Use ' before the closing > for final ms delay (optional)
 
-Example:
-in <out:>
-<out:><ifapp~: '\R?\7'db.txt, 1, 1000, <t: f:'><'true>
-<t:><'\Gtrue\W>
-<f:><'\Rfalse\W>
-
-Print to Terminal:
-<:x\n>	Custom message
-<'x>	Auto newline
-<' x>	No print. Use SPACE
-<'>	Print input
+Print to Terminal
+<:x\n>		Custom message
+<'x>		Auto newline
+<' x>		No print. Use SPACE
 		
-Options:
-\1-9    Color (or use \012\, \R, \G, \B, \W)
-\n      Newline
-\t      Tab
-\T      Time
-\g      >
-\c      Cb
-\0C\	Toggle
+Print options
+\1		Color (1-9). Or use \012\ \R \G \B \W
+\n		Newline
+\t		Tab
+\T		Time
+\g		>
+\c		Cb
+\i		Input
+\,		Clock
+\+		Counter
+\0C\		Toggle
 
 <''x>0		Use '' to dead line to the right
 <'''		0 db underneath
-
-Use <anu> to run on start
-<anu><'\T>
 
 Keyboard
 <ctrl>		Hold key
@@ -1267,7 +1288,6 @@ Keyboard
 <ps>
 <f12>
 <win 1>		Multi press
-
 in <shift><left 3><shift-><ctrl>x<ctrl->
 
 Sleep
@@ -1288,14 +1308,14 @@ Replace cb
 <lower>
 
 Set se.txt [ReplacerDb c:\anu\db.txt] for replacer ability
-te {x:}
+in {x:}
 x:1
 
 <Audio: c:\anu\fx.wav>
 <audio: play c:\anu\fx.mp3>
 
 Set se.txt [RgbScaleLayout] to match Display settings > Scale & layout. [1.00] is 100%
-<ifrgb:>	Continue running if rgbxy is true
+<ifrgb:>	Continue running if rgbxy is true (x y optional or use . for current location)
 <ifrgb~:>	Use ~ to move mouse pointer to x y if r g b x y is true
 
 Syntax		Use either & or | (optional)
@@ -1310,31 +1330,33 @@ Syntax		Use either & or | (optional)
 <ifcblen:>	Length
 
 <ifxy:>		Same logical options
-<if+:>		If counter
 
-<+>	Counter
-<+:1>	Use + - * / %
-<+: 1>	Use space for cb counter
+Counter
+<+>		Out
+<+:1>		Adjust counter with math. Use + - * / %
+<+: 1>		Use space for cb counter
+<if+:>		Stop if counters value is true. Same logical options
+<if+:1 x:>	Link to <x:> if counters value equals 1. Use space followed by the link
 
-Manual controls:
-<!:>	Set input; return
-<!!:>	Set repeat
-<!!!:>	Detach run
+Manual controls
+<!:>		Set input; return
+<!!:>		Set repeat
+<!!!:>		Detach run
 
-<app>	To cb
-<xy>	Out
+<app>		To cb
+<xy>		Out
 <rgb>
 <time>
 <time:>
 
-<cb>	Paste
-<cb:>	Set
+<cb>		Paste
+<cb:>		Set
 
-<db> algos:
+<db> algos
 <in:>		Scan db from top to bottom
 <!in:>		Strat scan at next line for <in:> (full circle). Use !
 <^in:>		Upwards scan. Use ^
-<!#!>		Get output from line #
+<!#!>		Get output from <db> line #. Use . for current
 <!#!in:>	With sanity check
 
 Misc.
@@ -1345,9 +1367,9 @@ CTRL+S inside
 [EditorDb] to rebuild [Database]
 [EditorSe] push new settings
 
-[Debug 2] Assume
+[Debug 2]	Assume
 
-VS Code: "[plaintext]": { "editor.insertSpaces": false, "editor.detectIndentation": false
+VS Code:	"[plaintext]": { "editor.insertSpaces": false, "editor.detectIndentation": false
 )"; //Use legacy terminal: WIN + "Terminal settings" > Windows Console Host
 
 }
@@ -1386,7 +1408,6 @@ static wstring getRGB(unsigned short bg = 0) {
 			{
 				wstring ms = bg == 2 ? qp : L"1";
 
-				//if (!ms[0]) num_error(L"<rgb {slot}>", L"?");
 				if (check_if_num(ms, L"<rgb {slot}>") == L"") {
 					c = out.length();
 					return L"";
@@ -1489,7 +1510,8 @@ static void scan_db() {
 	found_io = 0;
 	follow = 0;
 	stop = 0;
-	bool fallthrough_ = 0;
+	fallthrough_ = 0;
+	clo = 0;
 
 	for (size_t i = 0; i < vstrand.size(); ++i)
 	{
@@ -1758,12 +1780,6 @@ static void scan_db() {
 					case'\'':
 						if (qqb(L"<'")) { //<'comments>
 							if (qq[2] == '\'') { c = out.length(); break; }//<''ignore>...
-							else if (qq[2] == '>') { //<'>
-								wcout << vstrand.at(found_io - 1).in;
-								if (vstrand.at(found_io - 1).in[0] != '<')
-									wcout << vstrand.at(found_io - 1).g;
-								cout << '\n';
-							}
 							else if (qq[2] != ' ' && show_strand) {
 								showOutsMsg(L"", qp, L"", 1);
 								cout << '\n';
@@ -2113,17 +2129,17 @@ static void scan_db() {
 											tf_F_link = 1;
 									}
 
-									if (debug == 1) {
-										wcout << tf << " tf\n";
-										cout << tf_loop << " tf_loop\n";
-										cout << tf_T_link << " tf_T_link\n";
-										cout << tf_F_link << " tf_F_link\n";
-										cout << tf_T_link_plus_connect << " tf_T_link_plus_connect\n";
-										cout << tf_F_link_plus_connect << " tf_F_link_plus_connect\n";
-										cout << tf_T_continue << " tf_T_continue\n";
-										cout << tf_F_continue << " tf_F_continue\n";
-										cout << tf_F_retry << " tf_F_retry\n";
-									}
+									//if (debug == 1) {
+									//	wcout << tf << " tf\n";
+									//	cout << tf_loop << " tf_loop\n";
+									//	cout << tf_T_link << " tf_T_link\n";
+									//	cout << tf_F_link << " tf_F_link\n";
+									//	cout << tf_T_link_plus_connect << " tf_T_link_plus_connect\n";
+									//	cout << tf_F_link_plus_connect << " tf_F_link_plus_connect\n";
+									//	cout << tf_T_continue << " tf_T_continue\n";
+									//	cout << tf_F_continue << " tf_F_continue\n";
+									//	cout << tf_F_retry << " tf_F_retry\n";
+									//}
 								}
 
 								if (a.find('\\') != string::npos) {
@@ -2240,7 +2256,11 @@ static void scan_db() {
 													if (!X[0]) { X = t.substr(0, t.find(' ')); continue; }
 													if (!Y[0]) { Y = t; break; }
 												}
-
+												//if (debug == 1) {
+												//	t = R + G + B + X + Y;
+												//	t = regex_replace(a, wregex(L"-"), L"");
+												//	if (check_if_num(t, L"CHECK RGBXY slot") != L"") { stop = 1; break; }
+												//}
 
 												COLORREF color;
 												HDC hDC;
@@ -3049,7 +3069,7 @@ static LRESULT CALLBACK LowLevelKeyboardProc(int nCode, WPARAM wParam, LPARAM lP
 
 				if (pause || isWinKeyPressed || isCkey0Pressed) return 0; //cKey 0
 
-				if (debug == 1) printf("Virtual Key = %d, Scan Code = %d\n", p->vkCode, p->scanCode);
+				if (debug == 1) printf("Scan Code = %d\n", p->scanCode);
 
 				switch (p->scanCode) {
 				case 91:
