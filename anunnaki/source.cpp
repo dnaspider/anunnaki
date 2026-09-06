@@ -1959,17 +1959,17 @@ static void scan_db() {
 
 						t = qp;
 
-						for (size_t i = 0; i < qp.length(); ++i)
+						for (size_t i = 1; i < qp.length(); ++i)
 						{
-							if (qp.length() == 1) break;
 							if (qp[i] == ',') {
-								if (qp[i - 1] == '\\') {
+								if (!commas && qp[i - 1] == '\\') {
 									++slash_commas;
 									continue;
 								}
 								++commas;
 								continue;
 							}
+							if (commas) continue;
 							if (qp[i] == '|') {
 								if (qp[i - 1] == '\\') {
 									++slash_pipes;
