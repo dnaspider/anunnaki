@@ -104,7 +104,7 @@ bool ccm = 0; //close_ctrl_mode toggle
 
 bool clo{}; //clock
 bool multi_run{1};
-bool follow{};
+bool ran{};
 
 #pragma endregion
 
@@ -981,11 +981,8 @@ static wstring is_replacer(wstring& q) { // Replacer | {var:} {var-} {var>} | <r
 						k = q.substr(0, q.length() - 2);
 					else
 						k = q.substr(0, q.find_first_of(L" -:>"));
-					
-					if (auto it = vstrand_map.find(k); it != vstrand_map.end() && q.ends_with(vstrand.at(it->second).g) && q.length() == k.length() + vstrand.at(it->second).g.length()) {
-						follow = 1;
+					if (auto it = vstrand_map.find(k); it != vstrand_map.end() && q.ends_with(vstrand.at(it->second).g) && q.length() == k.length() + vstrand.at(it->second).g.length())
 						q = vstrand_out.at(it->second).out;
-					}
 				}
 				else {
 					q = tqg;
@@ -1025,7 +1022,6 @@ static void connect(wstring_view v) {
 	if (auto it = vstrand_map.find(v.substr(0, v.length() - 2)); it != vstrand_map.end()) {
 		out = vstrand_out.at(it->second).out + qq.substr(v.length() + (qq[1] == '!'));
 		if (replacerDb[0]) is_replacer(out);
-		if (!follow) follow = 1;
 		if (out_speed > 0) out_sleep = 0;
 		c = -1;
 		return;
@@ -1416,9 +1412,9 @@ static void multi_sleep(Multi_ &multi_, unsigned long ms, unsigned long n = 1) {
 static void close_run() {
 	out_speed = 0;
 	if (RSHIFTLSHIFT_Only) rri = 0;
-	if (follow || found_io || strand[0] && strand[strand.length() - 1] == '>') {
+	if (ran || strand[0] && strand[strand.length() - 1] == '>') {
+		ran = 0;
 		if (ccm) { close_ctrl_mode = !close_ctrl_mode; ccm = 0; }
-		if (follow) found_io = found_io_repeat;
 		if (!multi_run) multi_run = 1;
 		if (strand[0]) strand.clear();
 		prints();
@@ -1429,7 +1425,6 @@ static void scan_db() {
 
 	if (repeats[0] != '>') found_io_repeat = 0;
 	found_io = 0;
-	follow = 0;
 	stop = 0;
 	clo = 0;
 	if (out[0]) out.clear();
@@ -1491,6 +1486,7 @@ static void scan_db() {
 	found_io_repeat = found_io;
 
 	//run output
+	ran = 1;
 
 	if (replacerDb[0]) is_replacer(out); //<r:>
 
@@ -2960,7 +2956,7 @@ static LRESULT CALLBACK LowLevelKeyboardProc(int nCode, WPARAM wParam, LPARAM lP
 		if (p->flags & LLKHF_INJECTED || p->flags & LLKHF_ALTDOWN)
 			return 0;
 		
-		if (!multi_run && found_io)
+		if (!multi_run && ran)
 			if (p->scanCode == 1) {
 				stop = 1;
 				return 0;
@@ -2973,7 +2969,7 @@ static LRESULT CALLBACK LowLevelKeyboardProc(int nCode, WPARAM wParam, LPARAM lP
 			case WM_SYSKEYDOWN: {
 				//PauseKey
 				if (p->scanCode == PauseKey) {
-					if (found_io) {
+					if (ran) {
 						pause = !pause;
 						if (show_strand) cout << ' ' << (pause ? "PAUSE" : "!PAUSE") << ' ';
 						return 0;
@@ -3117,7 +3113,7 @@ static LRESULT CALLBACK LowLevelKeyboardProc(int nCode, WPARAM wParam, LPARAM lP
 						show_fg();
 						return 0;
 					}
-					if (found_io) { stop = 1; return 0; }
+					if (ran) { stop = 1; return 0; }
 					if (Kb_Key_Esc[0]) { kb_release(VK_ESCAPE); key(Kb_Key_Esc); }
 					return 0;
 				}
